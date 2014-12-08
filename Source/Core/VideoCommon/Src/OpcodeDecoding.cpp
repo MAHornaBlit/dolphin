@@ -21,6 +21,8 @@
 #include "Host.h"
 #include "HW/Memmap.h"
 #include "FifoPlayer/FifoRecorder.h"
+#include "RenderBase.h"
+
 
 #include "VertexLoaderManager.h"
 
@@ -496,15 +498,30 @@ void OpcodeDecoder_Shutdown()
 	}
 }
 
+int g_Eye = 0;
+
 u32 OpcodeDecoder_Run(bool skipped_frame)
 {
 	u32 totalCycles = 0;
-	u32 cycles = FifoCommandRunnable();
-	while (cycles > 0)
+	u8 *opcodeStart = g_pVideoData;
+	for (int eye = 0; eye < 2; ++eye)
 	{
-		skipped_frame ? DecodeSemiNop() : Decode();
-		totalCycles += cycles;
-		cycles = FifoCommandRunnable();
+		if (eye == 0)
+			g_renderer->ResetAPIState();
+		g_Eye = eye;
+		g_renderer->SetEye(eye);
+		g_pVideoData = opcodeStart;
+		totalCycles = 0;
+		u32 cycles = FifoCommandRunnable();
+		while (cycles > 0)
+		{
+			skipped_frame ? DecodeSemiNop() : Decode();
+			totalCycles += cycles;
+			cycles = FifoCommandRunnable();
+		}
+
+		if (eye == 0)
+			g_renderer->RestoreAPIState();
 	}
 	return totalCycles;
 }

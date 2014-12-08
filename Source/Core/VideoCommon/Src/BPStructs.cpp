@@ -27,6 +27,7 @@ static bool mapTexFound;
 static int numWrites;
 
 extern volatile bool g_bSkipCurrentFrame;
+extern int g_Eye;
 
 static const float s_gammaLUT[] = 
 {
@@ -232,7 +233,9 @@ void BPWritten(const BPCmd& bp)
 		switch (bp.newvalue & 0xFF)
 		{
 		case 0x02:
-			PixelEngine::SetFinish(); // may generate interrupt
+			//ES: Do this only for eye = 0;
+			if(g_Eye == 0)
+				PixelEngine::SetFinish(); // may generate interrupt
 			DEBUG_LOG(VIDEO, "GXSetDrawDone SetPEFinish (value: 0x%02X)", (bp.newvalue & 0xFFFF));
 			break;
 
@@ -242,11 +245,13 @@ void BPWritten(const BPCmd& bp)
 		}
 		break;
 	case BPMEM_PE_TOKEN_ID: // Pixel Engine Token ID
-		PixelEngine::SetToken(static_cast<u16>(bp.newvalue & 0xFFFF), false);
+		if (g_Eye == 0)
+			PixelEngine::SetToken(static_cast<u16>(bp.newvalue & 0xFFFF), false);
 		DEBUG_LOG(VIDEO, "SetPEToken 0x%04x", (bp.newvalue & 0xFFFF));
 		break;
 	case BPMEM_PE_TOKEN_INT_ID: // Pixel Engine Interrupt Token ID
-		PixelEngine::SetToken(static_cast<u16>(bp.newvalue & 0xFFFF), true);
+		if (g_Eye == 0)
+			PixelEngine::SetToken(static_cast<u16>(bp.newvalue & 0xFFFF), true);
 		DEBUG_LOG(VIDEO, "SetPEToken + INT 0x%04x", (bp.newvalue & 0xFFFF));
 		break;
 	// ------------------------
@@ -256,7 +261,6 @@ void BPWritten(const BPCmd& bp)
 		{
 			// The bottom right is within the rectangle
 			// The values in bpmem.copyTexSrcXY and bpmem.copyTexSrcWH are updated in case 0x49 and 0x4a in this function
-
 			EFBRectangle rc;
 			rc.left = (int)bpmem.copyTexSrcXY.x;
 			rc.top = (int)bpmem.copyTexSrcXY.y;

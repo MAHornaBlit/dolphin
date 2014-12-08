@@ -74,12 +74,16 @@ public:
 	static D3DTexture2D* &GetResolvedEFBColorTexture();
 	static D3DTexture2D* &GetResolvedEFBDepthTexture();
 
-	static D3DTexture2D* &GetEFBColorTempTexture() { return m_efb.color_temp_tex; }
+	static D3DTexture2D* &GetEFBColorTempTexture() { return m_efb[mEye].color_temp_tex; }
 	static void SwapReinterpretTexture()
 	{
 		D3DTexture2D* swaptex = GetEFBColorTempTexture();
-		m_efb.color_temp_tex = GetEFBColorTexture();
-		m_efb.color_tex = swaptex;
+		m_efb[mEye].color_temp_tex = GetEFBColorTexture();
+		m_efb[mEye].color_tex = swaptex;
+	}
+	static void SetEye(int eye) 
+	{
+		mEye = eye;
 	}
 
 private:
@@ -101,7 +105,8 @@ private:
 
 		D3DTexture2D* resolved_color_tex;
 		D3DTexture2D* resolved_depth_tex;
-	} m_efb;
+	} m_efb[2];
+	static unsigned int mEye;
 };
 
 }  // namespace DX11

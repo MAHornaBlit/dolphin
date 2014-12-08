@@ -104,6 +104,7 @@ public:
 	// What's the real difference between these? Too similar names.
 	virtual void ResetAPIState() = 0;
 	virtual void RestoreAPIState() = 0;
+	virtual void SetEye(int eye) = 0;
 
 	// Finish up the current frame, print some stats
 	virtual void Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight, const EFBRectangle& rc,float Gamma = 1.0f) = 0;

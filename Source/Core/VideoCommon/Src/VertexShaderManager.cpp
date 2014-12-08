@@ -38,6 +38,8 @@ static float s_fViewRotation[2];
 
 void UpdateViewport(Matrix44& vpCorrection);
 
+extern int g_Eye;
+
 void UpdateViewportWithCorrection()
 {
 	UpdateViewport(s_viewportCorrection);
@@ -463,7 +465,7 @@ void VertexShaderManager::SetConstants()
 
 		PRIM_LOG("Projection: %f %f %f %f %f %f\n", rawProjection[0], rawProjection[1], rawProjection[2], rawProjection[3], rawProjection[4], rawProjection[5]);
 
-		if ((g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo ) && xfregs.projection.type == GX_PERSPECTIVE)
+		if ((g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo ) && xfregs.projection.type == GX_PERSPECTIVE && g_Eye == 1)
 		{
 			Matrix44 mtxA;
 			Matrix44 mtxB;

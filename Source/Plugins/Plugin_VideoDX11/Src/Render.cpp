@@ -818,78 +818,95 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	if (Height < 0) Height = 0;
 	if (Width > (s_backbuffer_width - X)) Width = s_backbuffer_width - X;
 	if (Height > (s_backbuffer_height - Y)) Height = s_backbuffer_height - Y;
-	D3D11_VIEWPORT vp = CD3D11_VIEWPORT((float)X, (float)Y, (float)Width, (float)Height);
-	D3D::context->RSSetViewports(1, &vp);
-	D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
 
-	float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
-	D3D::context->ClearRenderTargetView(D3D::GetBackBuffer()->GetRTV(), ClearColor);
-
-	// activate linear filtering for the buffer copies
-	D3D::SetLinearCopySampler();
-
-	if (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB)
+	for (int eye = 0; eye < 2; ++eye)
 	{
-		// TODO: Television should be used to render Virtual XFB mode as well.
-		s_television.Submit(xfbAddr, fbWidth, fbHeight);
-		s_television.Render();
-	}
-	else if(g_ActiveConfig.bUseXFB)
-	{
-		const XFBSourceBase* xfbSource;
+		//Readjust viewport for eye
+		FramebufferManager::SetEye(eye);
+		X = 0;
+		Y = (s_backbuffer_height - Height) / 2;
+		Width = s_backbuffer_width / 2;
+		Height = s_backbuffer_height;
 
-		// draw each xfb source
-		for (u32 i = 0; i < xfbCount; ++i)
+		if (eye == 1)
+			X += Width;
+
+		D3D11_VIEWPORT vp = CD3D11_VIEWPORT((float)X, (float)Y, (float)Width, (float)Height);
+		D3D::context->RSSetViewports(1, &vp);
+		D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
+
+		if (eye == 0)
 		{
-			xfbSource = xfbSourceList[i];
-			MathUtil::Rectangle<float> sourceRc;
-			
-			sourceRc.left = 0;
-			sourceRc.top = 0;
-			sourceRc.right = (float)xfbSource->texWidth;
-			sourceRc.bottom = (float)xfbSource->texHeight;
-
-			MathUtil::Rectangle<float> drawRc;
-
-			if (g_ActiveConfig.bUseRealXFB)
-			{
-				drawRc.top = 1;
-				drawRc.bottom = -1;
-				drawRc.left = -1;
-				drawRc.right = 1;
-			}
-			else
-			{
-				// use virtual xfb with offset
-				int xfbHeight = xfbSource->srcHeight;
-				int xfbWidth = xfbSource->srcWidth;
-				int hOffset = ((s32)xfbSource->srcAddr - (s32)xfbAddr) / ((s32)fbWidth * 2);
-
-				drawRc.top = 1.0f - (2.0f * (hOffset) / (float)fbHeight);
-				drawRc.bottom = 1.0f - (2.0f * (hOffset + xfbHeight) / (float)fbHeight);
-				drawRc.left = -(xfbWidth / (float)fbWidth);
-				drawRc.right = (xfbWidth / (float)fbWidth);
-
-				// The following code disables auto stretch.  Kept for reference.
-				// scale draw area for a 1 to 1 pixel mapping with the draw target
-				//float vScale = (float)fbHeight / (float)s_backbuffer_height;
-				//float hScale = (float)fbWidth / (float)s_backbuffer_width;
-				//drawRc.top *= vScale;
-				//drawRc.bottom *= vScale;
-				//drawRc.left *= hScale;
-				//drawRc.right *= hScale;
-			}
-
-			xfbSource->Draw(sourceRc, drawRc, 0, 0);
+			float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
+			D3D::context->ClearRenderTargetView(D3D::GetBackBuffer()->GetRTV(), ClearColor);
 		}
-	}
-	else
-	{
-		TargetRectangle targetRc = Renderer::ConvertEFBRectangle(rc);
 
-		// TODO: Improve sampling algorithm for the pixel shader so that we can use the multisampled EFB texture as source
-		D3DTexture2D* read_texture = FramebufferManager::GetResolvedEFBColorTexture();
-		D3D::drawShadedTexQuad(read_texture->GetSRV(), targetRc.AsRECT(), Renderer::GetTargetWidth(), Renderer::GetTargetHeight(), PixelShaderCache::GetColorCopyProgram(false),VertexShaderCache::GetSimpleVertexShader(), VertexShaderCache::GetSimpleInputLayout(), Gamma);
+		// activate linear filtering for the buffer copies
+		D3D::SetLinearCopySampler();
+
+		if (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB)
+		{
+			// TODO: Television should be used to render Virtual XFB mode as well.
+			s_television.Submit(xfbAddr, fbWidth, fbHeight);
+			s_television.Render();
+		}
+		else if (g_ActiveConfig.bUseXFB)
+		{
+			const XFBSourceBase* xfbSource;
+
+			// draw each xfb source
+			for (u32 i = 0; i < xfbCount; ++i)
+			{
+				xfbSource = xfbSourceList[i];
+				MathUtil::Rectangle<float> sourceRc;
+
+				sourceRc.left = 0;
+				sourceRc.top = 0;
+				sourceRc.right = (float)xfbSource->texWidth;
+				sourceRc.bottom = (float)xfbSource->texHeight;
+
+				MathUtil::Rectangle<float> drawRc;
+
+				if (g_ActiveConfig.bUseRealXFB)
+				{
+					drawRc.top = 1;
+					drawRc.bottom = -1;
+					drawRc.left = -1;
+					drawRc.right = 1;
+				}
+				else
+				{
+					// use virtual xfb with offset
+					int xfbHeight = xfbSource->srcHeight;
+					int xfbWidth = xfbSource->srcWidth;
+					int hOffset = ((s32)xfbSource->srcAddr - (s32)xfbAddr) / ((s32)fbWidth * 2);
+
+					drawRc.top = 1.0f - (2.0f * (hOffset) / (float)fbHeight);
+					drawRc.bottom = 1.0f - (2.0f * (hOffset + xfbHeight) / (float)fbHeight);
+					drawRc.left = -(xfbWidth / (float)fbWidth);
+					drawRc.right = (xfbWidth / (float)fbWidth);
+
+					// The following code disables auto stretch.  Kept for reference.
+					// scale draw area for a 1 to 1 pixel mapping with the draw target
+					//float vScale = (float)fbHeight / (float)s_backbuffer_height;
+					//float hScale = (float)fbWidth / (float)s_backbuffer_width;
+					//drawRc.top *= vScale;
+					//drawRc.bottom *= vScale;
+					//drawRc.left *= hScale;
+					//drawRc.right *= hScale;
+				}
+
+				xfbSource->Draw(sourceRc, drawRc, 0, 0);
+			}
+		}
+		else
+		{
+			TargetRectangle targetRc = Renderer::ConvertEFBRectangle(rc);
+
+			// TODO: Improve sampling algorithm for the pixel shader so that we can use the multisampled EFB texture as source
+			D3DTexture2D* read_texture = FramebufferManager::GetResolvedEFBColorTexture();
+			D3D::drawShadedTexQuad(read_texture->GetSRV(), targetRc.AsRECT(), Renderer::GetTargetWidth(), Renderer::GetTargetHeight(), PixelShaderCache::GetColorCopyProgram(false), VertexShaderCache::GetSimpleVertexShader(), VertexShaderCache::GetSimpleInputLayout(), Gamma);
+		}
 	}
 
 	// done with drawing the game stuff, good moment to save a screenshot
@@ -1072,6 +1089,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	D3D::BeginFrame();
 	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
 	VertexShaderManager::SetViewportChanged();
+	FramebufferManager::SetEye(0);
 
 	Core::Callback_VideoCopiedToXFB(XFBWrited || (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB));
 	XFBWrited = false;
@@ -1083,6 +1101,11 @@ void Renderer::ResetAPIState()
 	D3D::stateman->PushBlendState(resetblendstate);
 	D3D::stateman->PushDepthState(resetdepthstate);
 	D3D::stateman->PushRasterizerState(resetraststate);
+}
+
+void Renderer::SetEye(int eye)
+{
+	FramebufferManager::SetEye(eye);
 }
 
 void Renderer::RestoreAPIState()
