@@ -27,7 +27,7 @@ static bool mapTexFound;
 static int numWrites;
 
 extern volatile bool g_bSkipCurrentFrame;
-extern int g_Eye;
+extern volatile int g_Eye;
 
 static const float s_gammaLUT[] = 
 {
@@ -39,8 +39,13 @@ static const float s_gammaLUT[] =
 
 void BPInit()
 {
-	memset(&bpmem, 0, sizeof(bpmem));
-	bpmem.bpMask = 0xFFFFFF;
+	memset(&bpmem1, 0, sizeof(bpmem1));
+	bpmem1.bpMask = 0xFFFFFF;
+
+	memset(&bpmem2, 0, sizeof(bpmem2));
+	bpmem2.bpMask = 0xFFFFFF;
+
+	cur_bpmem = &bpmem1;
 
 	mapTexAddress = 0;
 	numWrites = 0;
@@ -58,7 +63,7 @@ void BPWritten(const BPCmd& bp)
 	Purpose: Writes to the BP registers
 	Called: At the end of every: OpcodeDecoding.cpp ExecuteDisplayList > Decode() > LoadBPReg
 	How It Works: First the pipeline is flushed then update the bpmem with the new value.
-				  Some of the BP cases have to call certain functions while others just update the bpmem.
+				  Some of the BP cases have to call certain functions while others just update the cur_bpmem->
 				  some bp cases check the changes variable, because they might not have to be updated all the time
 	NOTE: it seems not all bp cases like checking changes, so calling if (bp.changes == 0 ? false : true)
 		  had to be ditched and the games seem to work fine with out it.
@@ -108,14 +113,14 @@ void BPWritten(const BPCmd& bp)
 			}
 			else if (++numWrites >= 100)	// seem that if 100 consecutive BP writes are called to either of these addresses in ZTP, 
 			{								// then it is safe to assume the map texture address is currently loaded into the BP memory
-				mapTexAddress = bpmem.tex[0].texImage3[0].hex << 5;
+				mapTexAddress = cur_bpmem->tex[0].texImage3[0].hex << 5;
 				mapTexFound = true;
 				WARN_LOG(VIDEO, "\nZTP map texture found at address %08x\n", mapTexAddress);
 			}
 			FlushPipeline();
 		}
-		else if ( (bpmem.tex[0].texImage3[0].hex << 5) != mapTexAddress ||
-					bpmem.tevorders[0].getEnable(0) == 0 ||
+		else if ( (cur_bpmem->tex[0].texImage3[0].hex << 5) != mapTexAddress ||
+					cur_bpmem->tevorders[0].getEnable(0) == 0 ||
 					bp.address == BPMEM_TREF)
 		{
 			FlushPipeline();
@@ -123,7 +128,7 @@ void BPWritten(const BPCmd& bp)
 	}  // END ZTP SPEEDUP HACK
 	else 
 	{
-		if (((s32*)&bpmem)[bp.address] == bp.newvalue)
+		if (((s32*)cur_bpmem)[bp.address] == bp.newvalue)
 		{
 			if (!(bp.address == BPMEM_TRIGGER_EFB_COPY
 					|| bp.address == BPMEM_CLEARBBOX1
@@ -144,16 +149,16 @@ void BPWritten(const BPCmd& bp)
 		FlushPipeline();
 	}
 
-	((u32*)&bpmem)[bp.address] = bp.newvalue;
+	((u32*)cur_bpmem)[bp.address] = bp.newvalue;
 	
 	switch (bp.address)
 	{
 	case BPMEM_GENMODE: // Set the Generation Mode
 		{
 			PRIM_LOG("genmode: texgen=%d, col=%d, multisampling=%d, tev=%d, cullmode=%d, ind=%d, zfeeze=%d",
-			bpmem.genMode.numtexgens, bpmem.genMode.numcolchans,
-			bpmem.genMode.multisampling, bpmem.genMode.numtevstages+1, bpmem.genMode.cullmode,
-			bpmem.genMode.numindstages, bpmem.genMode.zfreeze);
+			cur_bpmem->genMode.numtexgens, cur_bpmem->genMode.numcolchans,
+			cur_bpmem->genMode.multisampling, cur_bpmem->genMode.numtevstages+1, cur_bpmem->genMode.cullmode,
+			cur_bpmem->genMode.numindstages, cur_bpmem->genMode.zfreeze);
 
 			// Only call SetGenerationMode when cull mode changes.
 			if (bp.changes & 0xC000)
@@ -188,8 +193,8 @@ void BPWritten(const BPCmd& bp)
 		SetLineWidth();
 		break;
 	case BPMEM_ZMODE: // Depth Control
-		PRIM_LOG("zmode: test=%d, func=%d, upd=%d", bpmem.zmode.testenable, bpmem.zmode.func,
-		bpmem.zmode.updateenable);
+		PRIM_LOG("zmode: test=%d, func=%d, upd=%d", cur_bpmem->zmode.testenable, cur_bpmem->zmode.func,
+		cur_bpmem->zmode.updateenable);
 		SetDepthMode();
 		break;
 	case BPMEM_BLENDMODE: // Blending Control
@@ -197,8 +202,8 @@ void BPWritten(const BPCmd& bp)
 			if (bp.changes & 0xFFFF)
 			{
 				PRIM_LOG("blendmode: en=%d, open=%d, colupd=%d, alphaupd=%d, dst=%d, src=%d, sub=%d, mode=%d", 
-					bpmem.blendmode.blendenable, bpmem.blendmode.logicopenable, bpmem.blendmode.colorupdate, bpmem.blendmode.alphaupdate,
-					bpmem.blendmode.dstfactor, bpmem.blendmode.srcfactor, bpmem.blendmode.subtract, bpmem.blendmode.logicmode);
+					cur_bpmem->blendmode.blendenable, cur_bpmem->blendmode.logicopenable, cur_bpmem->blendmode.colorupdate, cur_bpmem->blendmode.alphaupdate,
+					cur_bpmem->blendmode.dstfactor, cur_bpmem->blendmode.srcfactor, cur_bpmem->blendmode.subtract, cur_bpmem->blendmode.logicmode);
 
 				// Set LogicOp Blending Mode
 				if (bp.changes & 0xF002) // logicopenable | logicmode
@@ -220,8 +225,8 @@ void BPWritten(const BPCmd& bp)
 		}
 	case BPMEM_CONSTANTALPHA: // Set Destination Alpha
 		{
-			PRIM_LOG("constalpha: alp=%d, en=%d", bpmem.dstalpha.alpha, bpmem.dstalpha.enable);
-			PixelShaderManager::SetDestAlpha(bpmem.dstalpha);
+			PRIM_LOG("constalpha: alp=%d, en=%d", cur_bpmem->dstalpha.alpha, cur_bpmem->dstalpha.enable);
+			PixelShaderManager::SetDestAlpha(cur_bpmem->dstalpha);
 			if(bp.changes & 0x100)
 				SetBlendMode();
 			break;
@@ -260,16 +265,16 @@ void BPWritten(const BPCmd& bp)
 	case BPMEM_TRIGGER_EFB_COPY: // Copy EFB Region or Render to the XFB or Clear the screen.
 		{
 			// The bottom right is within the rectangle
-			// The values in bpmem.copyTexSrcXY and bpmem.copyTexSrcWH are updated in case 0x49 and 0x4a in this function
+			// The values in cur_bpmem->copyTexSrcXY and cur_bpmem->copyTexSrcWH are updated in case 0x49 and 0x4a in this function
 			EFBRectangle rc;
-			rc.left = (int)bpmem.copyTexSrcXY.x;
-			rc.top = (int)bpmem.copyTexSrcXY.y;
+			rc.left = (int)cur_bpmem->copyTexSrcXY.x;
+			rc.top = (int)cur_bpmem->copyTexSrcXY.y;
 			
 			// Here Width+1 like Height, otherwise some textures are corrupted already since the native resolution.
-			rc.right = (int)(bpmem.copyTexSrcXY.x + bpmem.copyTexSrcWH.x + 1);
-			rc.bottom = (int)(bpmem.copyTexSrcXY.y + bpmem.copyTexSrcWH.y + 1);
+			rc.right = (int)(cur_bpmem->copyTexSrcXY.x + cur_bpmem->copyTexSrcWH.x + 1);
+			rc.bottom = (int)(cur_bpmem->copyTexSrcXY.y + cur_bpmem->copyTexSrcWH.y + 1);
 
-			UPE_Copy PE_copy = bpmem.triggerEFBCopy;
+			UPE_Copy PE_copy = cur_bpmem->triggerEFBCopy;
 
 			// Check if we are to copy from the EFB or draw to the XFB
 			if (PE_copy.copy_to_xfb == 0)
@@ -277,8 +282,8 @@ void BPWritten(const BPCmd& bp)
 				if (GetConfig(CONFIG_SHOWEFBREGIONS))
 					stats.efb_regions.push_back(rc);
 
-				CopyEFB(bpmem.copyTexDest << 5, PE_copy.tp_realFormat(),
-					bpmem.zcontrol.pixel_format, rc, PE_copy.intensity_fmt,
+				CopyEFB(cur_bpmem->copyTexDest << 5, PE_copy.tp_realFormat(),
+					cur_bpmem->zcontrol.pixel_format, rc, PE_copy.intensity_fmt,
 					PE_copy.half_scale);
 			}
 			else
@@ -291,11 +296,11 @@ void BPWritten(const BPCmd& bp)
 
 				float yScale;
 				if (PE_copy.scale_invert)
-					yScale = 256.0f / (float)bpmem.dispcopyyscale;
+					yScale = 256.0f / (float)cur_bpmem->dispcopyyscale;
 				else
-					yScale = (float)bpmem.dispcopyyscale / 256.0f;
+					yScale = (float)cur_bpmem->dispcopyyscale / 256.0f;
 
-				float xfbLines = ((bpmem.copyTexSrcWH.y + 1.0f) * yScale);
+				float xfbLines = ((cur_bpmem->copyTexSrcWH.y + 1.0f) * yScale);
 				if ((u32)xfbLines > MAX_XFB_HEIGHT)
 				{
 					INFO_LOG(VIDEO, "Tried to scale EFB to too many XFB lines (%f)", xfbLines);
@@ -303,8 +308,8 @@ void BPWritten(const BPCmd& bp)
 				}
 
 				RenderToXFB(bp, rc, yScale, xfbLines, 
-									 bpmem.copyTexDest << 5, 
-									 bpmem.copyMipMapStrideChannels << 4,
+									 cur_bpmem->copyTexDest << 5, 
+									 cur_bpmem->copyMipMapStrideChannels << 4,
 									 (u32)xfbLines,
 									 s_gammaLUT[PE_copy.gamma]);
 			}
@@ -317,7 +322,7 @@ void BPWritten(const BPCmd& bp)
 
 			break;
 		}
-	case BPMEM_LOADTLUT0: // This one updates bpmem.tlutXferSrc, no need to do anything here.
+	case BPMEM_LOADTLUT0: // This one updates cur_bpmem->tlutXferSrc, no need to do anything here.
 		break;
 	case BPMEM_LOADTLUT1: // Load a Texture Look Up Table
 		{
@@ -328,14 +333,14 @@ void BPWritten(const BPCmd& bp)
 
 			// TODO - figure out a cleaner way.
 			if (GetConfig(CONFIG_ISWII))
-				ptr = GetPointer(bpmem.tmem_config.tlut_src << 5);
+				ptr = GetPointer(cur_bpmem->tmem_config.tlut_src << 5);
 			else
-				ptr = GetPointer((bpmem.tmem_config.tlut_src & 0xFFFFF) << 5);
+				ptr = GetPointer((cur_bpmem->tmem_config.tlut_src & 0xFFFFF) << 5);
 
 			if (ptr)
 				memcpy_gc(texMem + tlutTMemAddr, ptr, tlutXferCount);
 			else
-				PanicAlert("Invalid palette pointer %08x %08x %08x", bpmem.tmem_config.tlut_src, bpmem.tmem_config.tlut_src << 5, (bpmem.tmem_config.tlut_src & 0xFFFFF)<< 5);
+				PanicAlert("Invalid palette pointer %08x %08x %08x", cur_bpmem->tmem_config.tlut_src, cur_bpmem->tmem_config.tlut_src << 5, (cur_bpmem->tmem_config.tlut_src & 0xFFFFF)<< 5);
 
 			break;
 		}
@@ -360,14 +365,14 @@ void BPWritten(const BPCmd& bp)
 			PixelShaderManager::SetFogColorChanged();
 		break;
 	case BPMEM_ALPHACOMPARE: // Compare Alpha Values
-		PRIM_LOG("alphacmp: ref0=%d, ref1=%d, comp0=%d, comp1=%d, logic=%d", bpmem.alpha_test.ref0,
-				bpmem.alpha_test.ref1, bpmem.alpha_test.comp0, bpmem.alpha_test.comp1, bpmem.alpha_test.logic);
-		PixelShaderManager::SetAlpha(bpmem.alpha_test);
+		PRIM_LOG("alphacmp: ref0=%d, ref1=%d, comp0=%d, comp1=%d, logic=%d", cur_bpmem->alpha_test.ref0,
+				cur_bpmem->alpha_test.ref1, cur_bpmem->alpha_test.comp0, cur_bpmem->alpha_test.comp1, cur_bpmem->alpha_test.logic);
+		PixelShaderManager::SetAlpha(cur_bpmem->alpha_test);
 		g_renderer->SetColorMask();
 		break;
 	case BPMEM_BIAS: // BIAS
-		PRIM_LOG("ztex bias=0x%x", bpmem.ztex1.bias);
-		PixelShaderManager::SetZTextureBias(bpmem.ztex1.bias);
+		PRIM_LOG("ztex bias=0x%x", cur_bpmem->ztex1.bias);
+		PixelShaderManager::SetZTextureBias(cur_bpmem->ztex1.bias);
 		break;
 	case BPMEM_ZTEX2: // Z Texture type
 		{
@@ -376,7 +381,7 @@ void BPWritten(const BPCmd& bp)
 			#if defined(_DEBUG) || defined(DEBUGFAST) 
 			const char* pzop[] = {"DISABLE", "ADD", "REPLACE", "?"};
 			const char* pztype[] = {"Z8", "Z16", "Z24", "?"};
-			PRIM_LOG("ztex op=%s, type=%s", pzop[bpmem.ztex2.op], pztype[bpmem.ztex2.type]);
+			PRIM_LOG("ztex op=%s, type=%s", pzop[cur_bpmem->ztex2.op], pztype[cur_bpmem->ztex2.type]);
 			#endif
 			break;
 		}
@@ -512,7 +517,7 @@ void BPWritten(const BPCmd& bp)
 			// TODO: Not quite sure if this is completely correct (likely not)
 			// NOTE: libogc's implementation of GX_PreloadEntireTexture seems flawed, so it's not necessarily a good reference for RE'ing this feature.
 
-			BPS_TmemConfig& tmem_cfg = bpmem.tmem_config;
+			BPS_TmemConfig& tmem_cfg = cur_bpmem->tmem_config;
 			u8* src_ptr = Memory::GetPointer(tmem_cfg.preload_addr << 5); // TODO: Should we add mask here on GC?
 			u32 size = tmem_cfg.preload_tile_info.count * TMEM_LINE_SIZE;
 			u32 tmem_addr_even = tmem_cfg.preload_tmem_even * TMEM_LINE_SIZE;
@@ -631,9 +636,9 @@ void BPWritten(const BPCmd& bp)
 				// don't compare with changes!
 				int num = (bp.address >> 1) & 0x3;
 				if ((bp.address & 1) == 0)
-					PixelShaderManager::SetColorChanged(bpmem.tevregs[num].low.type, num, false);
+					PixelShaderManager::SetColorChanged(cur_bpmem->tevregs[num].low.type, num, false);
 				else
-					PixelShaderManager::SetColorChanged(bpmem.tevregs[num].high.type, num, true);
+					PixelShaderManager::SetColorChanged(cur_bpmem->tevregs[num].high.type, num, true);
 			}
 			break;
 
@@ -727,11 +732,11 @@ void BPReload()
 	SetColorMask();
 	OnPixelFormatChange();
 	{
-		BPCmd bp = {BPMEM_FIELDMASK, 0xFFFFFF, static_cast<int>(((u32*)&bpmem)[BPMEM_FIELDMASK])};
+		BPCmd bp = {BPMEM_FIELDMASK, 0xFFFFFF, static_cast<int>(((u32*)cur_bpmem)[BPMEM_FIELDMASK])};
 		SetInterlacingMode(bp);
 	}
 	{
-		BPCmd bp = {BPMEM_FIELDMODE, 0xFFFFFF, static_cast<int>(((u32*)&bpmem)[BPMEM_FIELDMODE])};
+		BPCmd bp = {BPMEM_FIELDMODE, 0xFFFFFF, static_cast<int>(((u32*)cur_bpmem)[BPMEM_FIELDMODE])};
 		SetInterlacingMode(bp);
 	}
 }

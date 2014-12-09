@@ -146,6 +146,9 @@ xcopy "$(SolutionDir)..\Externals\msvcrt\$(PlatformName)\*.dll" "$(TargetDir)" /
 </Command>
       <Message>Copying Data\* to $(TargetDir)</Message>
     </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>portaudio.lib;dsound.lib;dxerr.lib;iphlpapi.lib;winmm.lib;setupapi.lib;xinput.lib;vfw32.lib;opengl32.lib;glew32s.lib;glu32.lib;rpcrt4.lib;comctl32.lib;libusb-1.0.lib;PolarSSL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -193,6 +196,9 @@ xcopy "$(SolutionDir)..\Externals\msvcrt\$(PlatformName)\*.dll" "$(TargetDir)" /
 </Command>
       <Message>Copying Data\* to $(TargetDir)</Message>
     </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>portaudio.lib;dsound.lib;dxerr.lib;iphlpapi.lib;winmm.lib;setupapi.lib;xinput.lib;vfw32.lib;opengl32.lib;glew32s.lib;glu32.lib;rpcrt4.lib;comctl32.lib;libusb-1.0.lib;PolarSSL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>

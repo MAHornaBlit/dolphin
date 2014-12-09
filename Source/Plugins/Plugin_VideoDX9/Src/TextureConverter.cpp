@@ -294,7 +294,7 @@ void EncodeToRamUsingShader(LPDIRECT3DPIXELSHADER9 shader, LPDIRECT3DTEXTURE9 sr
 			memcpy(destAddr + j*dstWidth*4, Source, dstWidth*4);
 			Source += drect.Pitch;
 		}
-		destAddr += bpmem.copyMipMapStrideChannels*32;
+		destAddr += cur_bpmem->copyMipMapStrideChannels*32;
 	}
 	
 	hr = s_texConvReadSurface->UnlockRect();

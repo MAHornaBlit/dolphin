@@ -358,7 +358,7 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 
 	const u8* src_data;
 	if (from_tmem)
-		src_data = &texMem[bpmem.tex[stage / 4].texImage1[stage % 4].tmem_even * TMEM_LINE_SIZE];
+		src_data = &texMem[cur_bpmem->tex[stage / 4].texImage1[stage % 4].tmem_even * TMEM_LINE_SIZE];
 	else
 		src_data = Memory::GetPointer(address);
 
@@ -462,7 +462,7 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 		}
 		else
 		{
-			u8* src_data_gb = &texMem[bpmem.tex[stage/4].texImage2[stage%4].tmem_odd * TMEM_LINE_SIZE];
+			u8* src_data_gb = &texMem[cur_bpmem->tex[stage/4].texImage2[stage%4].tmem_odd * TMEM_LINE_SIZE];
 			pcfmt = TexDecoder_DecodeRGBA8FromTmem(temp, src_data, src_data_gb, expandedWidth, expandedHeight);
 		}
 	}
@@ -521,8 +521,8 @@ TextureCache::TCacheEntryBase* TextureCache::Load(unsigned int const stage,
 			const u8* ptr_odd = NULL;
 			if (from_tmem)
 			{
-				ptr_even = &texMem[bpmem.tex[stage/4].texImage1[stage%4].tmem_even * TMEM_LINE_SIZE + texture_size];
-				ptr_odd = &texMem[bpmem.tex[stage/4].texImage2[stage%4].tmem_odd * TMEM_LINE_SIZE];
+				ptr_even = &texMem[cur_bpmem->tex[stage/4].texImage1[stage%4].tmem_even * TMEM_LINE_SIZE + texture_size];
+				ptr_odd = &texMem[cur_bpmem->tex[stage/4].texImage2[stage%4].tmem_odd * TMEM_LINE_SIZE];
 			}
 
 			for (; level != texLevels; ++level)

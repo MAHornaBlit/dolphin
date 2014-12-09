@@ -38,7 +38,7 @@ static float s_fViewRotation[2];
 
 void UpdateViewport(Matrix44& vpCorrection);
 
-extern int g_Eye;
+extern volatile int g_Eye;
 
 void UpdateViewportWithCorrection()
 {

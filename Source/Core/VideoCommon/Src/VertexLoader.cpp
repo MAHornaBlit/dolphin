@@ -560,7 +560,7 @@ int VertexLoader::SetupRunVertices(int vtx_attr_group, int primitive, int const 
 	}
 	g_nativeVertexFmt = m_NativeFmt;
 
-	if (bpmem.genMode.cullmode == 3 && primitive < 5)
+	if (cur_bpmem->genMode.cullmode == 3 && primitive < 5)
 	{
 		// if cull mode is none, ignore triangles and quads
 		DataSkip(count * m_VertexSize);

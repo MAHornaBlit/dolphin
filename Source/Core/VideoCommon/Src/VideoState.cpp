@@ -18,7 +18,7 @@
 static void DoState(PointerWrap &p)
 {
 	// BP Memory
-	p.Do(bpmem);
+	p.Do(bpmem1);
 	p.DoMarker("BP Memory");
 
 	// CP Memory

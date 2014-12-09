@@ -137,7 +137,7 @@ namespace HwRasterizer
 	static float width, height;
 	void LoadTexture()
 	{
-		FourTexUnits &texUnit = bpmem.tex[0];
+		FourTexUnits &texUnit = cur_bpmem->tex[0];
 		u32 imageAddr = texUnit.texImage3[0].image_base;
 		// Texture Rectangle uses pixel coordinates
 		// While GLES uses texture coordinates
@@ -163,7 +163,7 @@ namespace HwRasterizer
 		glEnable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND);
 
-		hasTexture = bpmem.tevorders[0].enable0;
+		hasTexture = cur_bpmem->tevorders[0].enable0;
 
 		if (hasTexture)
 			LoadTexture();
@@ -284,16 +284,16 @@ namespace HwRasterizer
 
 	void Clear()
 	{
-		u8 r = (bpmem.clearcolorAR & 0x00ff);
-		u8 g = (bpmem.clearcolorGB & 0xff00) >> 8;
-		u8 b = (bpmem.clearcolorGB & 0x00ff);
-		u8 a = (bpmem.clearcolorAR & 0xff00) >> 8;
+		u8 r = (cur_bpmem->clearcolorAR & 0x00ff);
+		u8 g = (cur_bpmem->clearcolorGB & 0xff00) >> 8;
+		u8 b = (cur_bpmem->clearcolorGB & 0x00ff);
+		u8 a = (cur_bpmem->clearcolorAR & 0xff00) >> 8;
 
-		GLfloat left   = (GLfloat)bpmem.copyTexSrcXY.x / efbHalfWidth - 1.0f;
-		GLfloat top    = 1.0f - (GLfloat)bpmem.copyTexSrcXY.y / efbHalfHeight;
-		GLfloat right  = (GLfloat)(left + bpmem.copyTexSrcWH.x + 1) / efbHalfWidth - 1.0f;
-		GLfloat bottom = 1.0f - (GLfloat)(top + bpmem.copyTexSrcWH.y + 1) / efbHalfHeight;
-		GLfloat depth = (GLfloat)bpmem.clearZValue / (GLfloat)0x00ffffff;
+		GLfloat left   = (GLfloat)cur_bpmem->copyTexSrcXY.x / efbHalfWidth - 1.0f;
+		GLfloat top    = 1.0f - (GLfloat)cur_bpmem->copyTexSrcXY.y / efbHalfHeight;
+		GLfloat right  = (GLfloat)(left + cur_bpmem->copyTexSrcWH.x + 1) / efbHalfWidth - 1.0f;
+		GLfloat bottom = 1.0f - (GLfloat)(top + cur_bpmem->copyTexSrcWH.y + 1) / efbHalfHeight;
+		GLfloat depth = (GLfloat)cur_bpmem->clearZValue / (GLfloat)0x00ffffff;
 		static const GLfloat verts[4][3] = {
 			{ left, top, depth },
 			{ right, top, depth },
@@ -318,7 +318,7 @@ namespace HwRasterizer
 
 	void TexCacheEntry::Create()
 	{
-		FourTexUnits &texUnit = bpmem.tex[0];
+		FourTexUnits &texUnit = cur_bpmem->tex[0];
 
 		texImage0.hex = texUnit.texImage0[0].hex;
 		texImage1.hex = texUnit.texImage1[0].hex;
@@ -352,7 +352,7 @@ namespace HwRasterizer
 
 	void TexCacheEntry::Update()
 	{
-		FourTexUnits &texUnit = bpmem.tex[0];
+		FourTexUnits &texUnit = cur_bpmem->tex[0];
 
 		// extra checks cause textures to be reloaded much more
 		if (texUnit.texImage0[0].hex != texImage0.hex ||

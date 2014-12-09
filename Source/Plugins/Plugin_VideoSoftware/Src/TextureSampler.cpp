@@ -60,7 +60,7 @@ void Sample(s32 s, s32 t, s32 lod, bool linear, u8 texmap, u8 *sample)
 	bool mipLinear = false;
 
 #if (ALLOW_MIPMAP)
-	FourTexUnits& texUnit = bpmem.tex[(texmap >> 2) & 1];
+	FourTexUnits& texUnit = cur_bpmem->tex[(texmap >> 2) & 1];
 	TexMode0& tm0 = texUnit.texMode0[texmap & 3];
 
 	s32 lodFract = lod & 0xf;
@@ -100,7 +100,7 @@ void Sample(s32 s, s32 t, s32 lod, bool linear, u8 texmap, u8 *sample)
 
 void SampleMip(s32 s, s32 t, s32 mip, bool linear, u8 texmap, u8 *sample)
 {
-	FourTexUnits& texUnit = bpmem.tex[(texmap >> 2) & 1];
+	FourTexUnits& texUnit = cur_bpmem->tex[(texmap >> 2) & 1];
 	u8 subTexmap = texmap & 3;
 
 	TexMode0& tm0 = texUnit.texMode0[subTexmap];

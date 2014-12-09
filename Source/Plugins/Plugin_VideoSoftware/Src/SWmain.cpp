@@ -98,7 +98,7 @@ void VideoSoftware::DoState(PointerWrap& p)
 	OpcodeDecoder::DoState(p);
 	Clipper::DoState(p);
 	p.Do(swxfregs);
-	p.Do(bpmem);
+	p.Do(bpmem1);
 	p.DoPOD(swstats);
 
 	// CP Memory

@@ -26,6 +26,7 @@ public:
 
 	void ApplyState(bool bUseDstAlpha);
 	void RestoreState();
+	void ReSetCurrentEyeRT() { }
 
 	void RenderText(const char* pstr, int left, int top, u32 color);
 
@@ -33,6 +34,7 @@ public:
 
 	void ResetAPIState();
 	void RestoreAPIState();
+	void SetEyeMode(int eye) { }
 
 	TargetRectangle ConvertEFBRectangle(const EFBRectangle& rc);
 

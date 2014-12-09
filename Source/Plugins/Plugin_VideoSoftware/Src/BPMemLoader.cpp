@@ -16,22 +16,22 @@
 
 void InitBPMemory()
 {
-	memset(&bpmem, 0, sizeof(bpmem));
-	bpmem.bpMask = 0xFFFFFF;
+	memset(cur_bpmem, 0, sizeof(bpmem1));
+	cur_bpmem->bpMask = 0xFFFFFF;
 }
 
 void SWLoadBPReg(u32 value)
 {
 	//handle the mask register
 	int address = value >> 24;
-	int oldval = ((u32*)&bpmem)[address];
-	int newval = (oldval & ~bpmem.bpMask) | (value & bpmem.bpMask);
+	int oldval = ((u32*)cur_bpmem)[address];
+	int newval = (oldval & ~cur_bpmem->bpMask) | (value & cur_bpmem->bpMask);
 
-	((u32*)&bpmem)[address] = newval;
+	((u32*)cur_bpmem)[address] = newval;
 
 	//reset the mask register
 	if (address != 0xFE)
-		bpmem.bpMask = 0xFFFFFF;
+		cur_bpmem->bpMask = 0xFFFFFF;
 
 	SWBPWritten(address, newval);
 }
@@ -46,25 +46,25 @@ void SWBPWritten(int address, int newvalue)
 		Rasterizer::SetScissor();
 		break;
 	case BPMEM_SETDRAWDONE: // This is called when the game is done drawing (eg: like in DX: Begin(); Draw(); End();)
-		switch (bpmem.drawdone & 0xFF)
+		switch (cur_bpmem->drawdone & 0xFF)
 		{
 		case 0x02:
 			SWPixelEngine::SetFinish(); // may generate interrupt
-			DEBUG_LOG(VIDEO, "GXSetDrawDone SetPEFinish (value: 0x%02X)", (bpmem.drawdone & 0xFFFF));
+			DEBUG_LOG(VIDEO, "GXSetDrawDone SetPEFinish (value: 0x%02X)", (cur_bpmem->drawdone & 0xFFFF));
 			break;
 
 		default:
-			WARN_LOG(VIDEO, "GXSetDrawDone ??? (value 0x%02X)", (bpmem.drawdone & 0xFFFF));
+			WARN_LOG(VIDEO, "GXSetDrawDone ??? (value 0x%02X)", (cur_bpmem->drawdone & 0xFFFF));
 			break;
 		}
 		break;
 	case BPMEM_PE_TOKEN_ID: // Pixel Engine Token ID
-		DEBUG_LOG(VIDEO, "SetPEToken 0x%04x", (bpmem.petoken & 0xFFFF));
-		SWPixelEngine::SetToken(static_cast<u16>(bpmem.petokenint & 0xFFFF), false);
+		DEBUG_LOG(VIDEO, "SetPEToken 0x%04x", (cur_bpmem->petoken & 0xFFFF));
+		SWPixelEngine::SetToken(static_cast<u16>(cur_bpmem->petokenint & 0xFFFF), false);
 		break;
 	case BPMEM_PE_TOKEN_INT_ID: // Pixel Engine Interrupt Token ID
-		DEBUG_LOG(VIDEO, "SetPEToken + INT 0x%04x", (bpmem.petokenint & 0xFFFF));
-		SWPixelEngine::SetToken(static_cast<u16>(bpmem.petokenint & 0xFFFF), true);
+		DEBUG_LOG(VIDEO, "SetPEToken + INT 0x%04x", (cur_bpmem->petokenint & 0xFFFF));
+		SWPixelEngine::SetToken(static_cast<u16>(cur_bpmem->petokenint & 0xFFFF), true);
 		break;
 	case BPMEM_TRIGGER_EFB_COPY:
 		EfbCopy::CopyEfb();
@@ -92,7 +92,7 @@ void SWBPWritten(int address, int newvalue)
 		SWPixelEngine::pereg.perfEfbCopyClocksLo = 0;
 		SWPixelEngine::pereg.perfEfbCopyClocksHi = 0;
 		break;
-	case BPMEM_LOADTLUT0: // This one updates bpmem.tlutXferSrc, no need to do anything here.
+	case BPMEM_LOADTLUT0: // This one updates cur_bpmem->tlutXferSrc, no need to do anything here.
 		break;
 	case BPMEM_LOADTLUT1: // Load a Texture Look Up Table
 		{
@@ -103,14 +103,14 @@ void SWBPWritten(int address, int newvalue)
 
 			// TODO - figure out a cleaner way.
 			if (Core::g_CoreStartupParameter.bWii)
-				ptr = Memory::GetPointer(bpmem.tmem_config.tlut_src << 5);
+				ptr = Memory::GetPointer(cur_bpmem->tmem_config.tlut_src << 5);
 			else
-				ptr = Memory::GetPointer((bpmem.tmem_config.tlut_src & 0xFFFFF) << 5);
+				ptr = Memory::GetPointer((cur_bpmem->tmem_config.tlut_src & 0xFFFFF) << 5);
 
 			if (ptr)
 				memcpy_gc(texMem + tlutTMemAddr, ptr, tlutXferCount);
 			else
-				PanicAlert("Invalid palette pointer %08x %08x %08x", bpmem.tmem_config.tlut_src, bpmem.tmem_config.tlut_src << 5, (bpmem.tmem_config.tlut_src & 0xFFFFF)<< 5);
+				PanicAlert("Invalid palette pointer %08x %08x %08x", cur_bpmem->tmem_config.tlut_src, cur_bpmem->tmem_config.tlut_src << 5, (cur_bpmem->tmem_config.tlut_src & 0xFFFFF)<< 5);
 			break;
 		}
 
@@ -120,7 +120,7 @@ void SWBPWritten(int address, int newvalue)
 			// TODO: Not quite sure if this is completely correct (likely not)
 			// NOTE: libogc's implementation of GX_PreloadEntireTexture seems flawed, so it's not necessarily a good reference for RE'ing this feature.
 
-			BPS_TmemConfig& tmem_cfg = bpmem.tmem_config;
+			BPS_TmemConfig& tmem_cfg = cur_bpmem->tmem_config;
 			u8* src_ptr = Memory::GetPointer(tmem_cfg.preload_addr << 5); // TODO: Should we add mask here on GC?
 			u32 size = tmem_cfg.preload_tile_info.count * TMEM_LINE_SIZE;
 			u32 tmem_addr_even = tmem_cfg.preload_tmem_even * TMEM_LINE_SIZE;
@@ -159,7 +159,7 @@ void SWBPWritten(int address, int newvalue)
 	case BPMEM_TEV_REGISTER_L+6: // Reg 4
 		{
 			int regNum = (address >> 1 ) & 0x3;
-			ColReg& reg = bpmem.tevregs[regNum].low;
+			ColReg& reg = cur_bpmem->tevregs[regNum].low;
 			bool konst = reg.type;
 
 			Rasterizer::SetTevReg(regNum, Tev::ALP_C, konst, reg.b); // A
@@ -174,7 +174,7 @@ void SWBPWritten(int address, int newvalue)
 	case BPMEM_TEV_REGISTER_H+6: // Reg 4
 		{
 			int regNum = (address >> 1 ) & 0x3;
-			ColReg& reg = bpmem.tevregs[regNum].high;
+			ColReg& reg = cur_bpmem->tevregs[regNum].high;
 			bool konst = reg.type;
 
 			Rasterizer::SetTevReg(regNum, Tev::GRN_C, konst, reg.b); // G

@@ -1173,13 +1173,13 @@ size_t PSTextureEncoder::Encode(u8* dst, unsigned int dstFormat,
 		for (unsigned int y = 0; y < numBlocksY; ++y)
 		{
 			memcpy(dst, src, cacheLinesPerRow*32);
-			dst += bpmem.copyMipMapStrideChannels*32;
+			dst += cur_bpmem->copyMipMapStrideChannels*32;
 			src += map.RowPitch;
 		}
 
 		D3D::context->Unmap(m_outStage, 0);
 
-		encodeSize = bpmem.copyMipMapStrideChannels*32 * numBlocksY;
+		encodeSize = cur_bpmem->copyMipMapStrideChannels*32 * numBlocksY;
 	}
 
 	// Restore API

@@ -280,11 +280,11 @@ void Renderer::SetColorMask()
 {
 	// Only enable alpha channel if it's supported by the current EFB format
 	DWORD color_mask = 0;
-	if (bpmem.alpha_test.TestResult() != AlphaTest::FAIL)
+	if (cur_bpmem->alpha_test.TestResult() != AlphaTest::FAIL)
 	{
-		if (bpmem.blendmode.alphaupdate && (bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24))
+		if (cur_bpmem->blendmode.alphaupdate && (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24))
 			color_mask = D3DCOLORWRITEENABLE_ALPHA;
-		if (bpmem.blendmode.colorupdate)
+		if (cur_bpmem->blendmode.colorupdate)
 			color_mask |= D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_BLUE;
 	}
 	D3D::SetRenderState(D3DRS_COLORWRITEENABLE, color_mask);
@@ -434,7 +434,7 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 		pSystemBuf->UnlockRect();
 
 		// if Z is in 16 bit format you must return a 16 bit integer
-		if(bpmem.zcontrol.pixel_format == PIXELFMT_RGB565_Z16) {
+		if(cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB565_Z16) {
 			z >>= 8;
 		}
 
@@ -462,15 +462,15 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 		PixelEngine::UPEAlphaReadReg alpha_read_mode;
 		PixelEngine::Read16((u16&)alpha_read_mode, PE_ALPHAREAD);
 
-		if (bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
+		if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
 		{
 			ret = RGBA8ToRGBA6ToRGBA8(ret);
 		}
-		else if (bpmem.zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
+		else if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
 		{
 			ret = RGBA8ToRGB565ToRGBA8(ret);
 		}
-		if(bpmem.zcontrol.pixel_format != PIXELFMT_RGBA6_Z24)
+		if(cur_bpmem->zcontrol.pixel_format != PIXELFMT_RGBA6_Z24)
 		{
 			ret |= 0xFF000000;
 		}
@@ -526,8 +526,8 @@ void Renderer::UpdateViewport(Matrix44& vpCorrection)
 	// [4] = yorig + height/2 + 342
 	// [5] = 16777215 * farz
 
-	int scissorXOff = bpmem.scissorOffset.x * 2;
-	int scissorYOff = bpmem.scissorOffset.y * 2;
+	int scissorXOff = cur_bpmem->scissorOffset.x * 2;
+	int scissorYOff = cur_bpmem->scissorOffset.y * 2;
 
 	// TODO: ceil, floor or just cast to int?
 	int intendedX = EFBToScaledX((int)ceil(xfregs.viewport.xOrig - xfregs.viewport.wd - scissorXOff));
@@ -653,10 +653,10 @@ void Renderer::SetBlendMode(bool forceUpdate)
 {
 	// Our render target always uses an alpha channel, so we need to override the blend functions to assume a destination alpha of 1 if the render target isn't supposed to have an alpha channel
 	// Example: D3DBLEND_DESTALPHA needs to be D3DBLEND_ONE since the result without an alpha channel is assumed to always be 1.
-	bool target_has_alpha = bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
+	bool target_has_alpha = cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
 	//bDstAlphaPass is taken into account because the ability to disable alpha composition is
 	//really useful for debugging shader and blending errors
-	bool use_DstAlpha = !g_ActiveConfig.bDstAlphaPass && bpmem.dstalpha.enable && bpmem.blendmode.alphaupdate && target_has_alpha;
+	bool use_DstAlpha = !g_ActiveConfig.bDstAlphaPass && cur_bpmem->dstalpha.enable && cur_bpmem->blendmode.alphaupdate && target_has_alpha;
 	bool use_DualSource = use_DstAlpha && g_ActiveConfig.backend_info.bSupportsDualSourceBlend;
 	const D3DBLEND d3dSrcFactors[8] =
 	{
@@ -681,21 +681,21 @@ void Renderer::SetBlendMode(bool forceUpdate)
 		(target_has_alpha) ? D3DBLEND_INVDESTALPHA : D3DBLEND_ZERO
 	};
 
-	if (bpmem.blendmode.logicopenable && !forceUpdate)
+	if (cur_bpmem->blendmode.logicopenable && !forceUpdate)
 	{
 		D3D::SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE , false);
 		return;
 	}
 
-	bool blend_enable = bpmem.blendmode.subtract || bpmem.blendmode.blendenable;
+	bool blend_enable = cur_bpmem->blendmode.subtract || cur_bpmem->blendmode.blendenable;
 	D3D::SetRenderState(D3DRS_ALPHABLENDENABLE, blend_enable);
 	D3D::SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, blend_enable && g_ActiveConfig.backend_info.bSupportsSeparateAlphaFunction);
 	if (blend_enable)
 	{
 		D3DBLENDOP op = D3DBLENDOP_ADD;
-		u32 srcidx = bpmem.blendmode.srcfactor;
-		u32 dstidx = bpmem.blendmode.dstfactor;
-		if (bpmem.blendmode.subtract)
+		u32 srcidx = cur_bpmem->blendmode.srcfactor;
+		u32 dstidx = cur_bpmem->blendmode.dstfactor;
+		if (cur_bpmem->blendmode.subtract)
 		{
 			op = D3DBLENDOP_REVSUBTRACT;
 			srcidx = GX_BL_ONE;
@@ -1116,12 +1116,12 @@ void Renderer::ApplyState(bool bUseDstAlpha)
 {
 	if (bUseDstAlpha)
 	{
-		// If we get here we are sure that we are using dst alpha pass. (bpmem.dstalpha.enable)
-		// Alpha write is enabled. (because bpmem.blendmode.alphaupdate && bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
+		// If we get here we are sure that we are using dst alpha pass. (cur_bpmem->dstalpha.enable)
+		// Alpha write is enabled. (because cur_bpmem->blendmode.alphaupdate && cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
 		// We must disable blend because we want to write alpha value directly to the alpha channel without modifications.
 		D3D::ChangeRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA);
 		D3D::ChangeRenderState(D3DRS_ALPHABLENDENABLE, false);
-		if(bpmem.zmode.testenable && bpmem.zmode.updateenable)
+		if(cur_bpmem->zmode.testenable && cur_bpmem->zmode.updateenable)
 		{
 			// This is needed to draw to the correct pixels in multi-pass algorithms
 			// to avoid z-fighting and grants that you write to the same pixels
@@ -1136,7 +1136,7 @@ void Renderer::RestoreState()
 {
 	D3D::RefreshRenderState(D3DRS_COLORWRITEENABLE);
 	D3D::RefreshRenderState(D3DRS_ALPHABLENDENABLE);
-	if(bpmem.zmode.testenable && bpmem.zmode.updateenable)
+	if(cur_bpmem->zmode.testenable && cur_bpmem->zmode.updateenable)
 	{
 		D3D::RefreshRenderState(D3DRS_ZWRITEENABLE);
 		D3D::RefreshRenderState(D3DRS_ZFUNC);
@@ -1166,9 +1166,9 @@ void Renderer::RestoreAPIState()
 	D3D::SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
 	VertexShaderManager::SetViewportChanged();
 	BPFunctions::SetScissor();
-	if (bpmem.zmode.testenable) {
+	if (cur_bpmem->zmode.testenable) {
 		D3D::SetRenderState(D3DRS_ZENABLE, TRUE);
-		if (bpmem.zmode.updateenable)
+		if (cur_bpmem->zmode.updateenable)
 			D3D::SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
 	}
 	SetColorMask();
@@ -1186,7 +1186,7 @@ void Renderer::SetGenerationMode()
 		D3DCULL_CCW
 	};
 
-	D3D::SetRenderState(D3DRS_CULLMODE, d3dCullModes[bpmem.genMode.cullmode]);
+	D3D::SetRenderState(D3DRS_CULLMODE, d3dCullModes[cur_bpmem->genMode.cullmode]);
 }
 
 void Renderer::SetDepthMode()
@@ -1203,11 +1203,11 @@ void Renderer::SetDepthMode()
 		D3DCMP_ALWAYS
 	};
 
-	if (bpmem.zmode.testenable)
+	if (cur_bpmem->zmode.testenable)
 	{
 		D3D::SetRenderState(D3DRS_ZENABLE, TRUE);
-		D3D::SetRenderState(D3DRS_ZWRITEENABLE, bpmem.zmode.updateenable);
-		D3D::SetRenderState(D3DRS_ZFUNC, d3dCmpFuncs[bpmem.zmode.func]);
+		D3D::SetRenderState(D3DRS_ZWRITEENABLE, cur_bpmem->zmode.updateenable);
+		D3D::SetRenderState(D3DRS_ZFUNC, d3dCmpFuncs[cur_bpmem->zmode.func]);
 	}
 	else
 	{
@@ -1295,12 +1295,12 @@ void Renderer::SetLogicOpMode()
 		D3DBLEND_ONE
 	};
 
-	if (bpmem.blendmode.logicopenable)
+	if (cur_bpmem->blendmode.logicopenable)
 	{
 		D3D::SetRenderState(D3DRS_ALPHABLENDENABLE, true);
-		D3D::SetRenderState(D3DRS_BLENDOP, d3dLogicOpop[bpmem.blendmode.logicmode]);
-		D3D::SetRenderState(D3DRS_SRCBLEND, d3dLogicOpSrcFactors[bpmem.blendmode.logicmode]);
-		D3D::SetRenderState(D3DRS_DESTBLEND, d3dLogicOpDestFactors[bpmem.blendmode.logicmode]);
+		D3D::SetRenderState(D3DRS_BLENDOP, d3dLogicOpop[cur_bpmem->blendmode.logicmode]);
+		D3D::SetRenderState(D3DRS_SRCBLEND, d3dLogicOpSrcFactors[cur_bpmem->blendmode.logicmode]);
+		D3D::SetRenderState(D3DRS_DESTBLEND, d3dLogicOpDestFactors[cur_bpmem->blendmode.logicmode]);
 	}
 	else
 	{
@@ -1310,14 +1310,14 @@ void Renderer::SetLogicOpMode()
 
 void Renderer::SetDitherMode()
 {
-	D3D::SetRenderState(D3DRS_DITHERENABLE, bpmem.blendmode.dither);
+	D3D::SetRenderState(D3DRS_DITHERENABLE, cur_bpmem->blendmode.dither);
 }
 
 void Renderer::SetLineWidth()
 {
 	// We can't change line width in D3D unless we use ID3DXLine
 	float fratio = xfregs.viewport.wd != 0 ? Renderer::EFBToScaledXf(1.f) : 1.0f;
-	float psize = bpmem.lineptwidth.pointsize * fratio / 6.0f;
+	float psize = cur_bpmem->lineptwidth.pointsize * fratio / 6.0f;
 	psize = psize > 0 ? psize : 1.0f;
 	if (psize > m_fMaxPointSize)
 	{
@@ -1345,7 +1345,7 @@ void Renderer::SetSamplerState(int stage, int texindex)
 		D3DTADDRESS_WRAP //reserved
 	};
 
-	const FourTexUnits &tex = bpmem.tex[texindex];
+	const FourTexUnits &tex = cur_bpmem->tex[texindex];
 	const TexMode0 &tm0 = tex.texMode0[stage];
 	const TexMode1 &tm1 = tex.texMode1[stage];
 

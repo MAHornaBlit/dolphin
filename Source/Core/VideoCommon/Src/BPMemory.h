@@ -1046,9 +1046,12 @@ struct BPMemory
 
 #pragma pack()
 
-extern BPMemory bpmem;
+extern BPMemory bpmem1,bpmem2,*cur_bpmem;
 
 void LoadBPReg(u32 value0);
+
+void SaveBPMem();
+void RestoreBPMem();
 
 void GetBPRegInfo(const u8* data, char* name, size_t name_size, char* desc, size_t desc_size);
 

@@ -869,8 +869,8 @@ TargetRectangle Renderer::ConvertEFBRectangle(const EFBRectangle& rc)
 // Call browser: OpcodeDecoding.cpp ExecuteDisplayList > Decode() > LoadBPReg()
 //		case 0x52 > SetScissorRect()
 // ----------------------------
-// bpmem.scissorTL.x, y = 342x342
-// bpmem.scissorBR.x, y = 981x821
+// cur_bpmem->scissorTL.x, y = 342x342
+// cur_bpmem->scissorBR.x, y = 981x821
 // Renderer::GetTargetHeight() = the fixed ini file setting
 // donkopunchstania - it appears scissorBR is the bottom right pixel inside the scissor box
 // therefore the width and height are (scissorBR + 1) - scissorTL
@@ -883,11 +883,11 @@ void Renderer::SetColorMask()
 {
 	// Only enable alpha channel if it's supported by the current EFB format
 	GLenum ColorMask = GL_FALSE, AlphaMask = GL_FALSE;
-	if (bpmem.alpha_test.TestResult() != AlphaTest::FAIL)
+	if (cur_bpmem->alpha_test.TestResult() != AlphaTest::FAIL)
 	{
-		if (bpmem.blendmode.colorupdate)
+		if (cur_bpmem->blendmode.colorupdate)
 			ColorMask = GL_TRUE;
-		if (bpmem.blendmode.alphaupdate && (bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24))
+		if (cur_bpmem->blendmode.alphaupdate && (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24))
 			AlphaMask = GL_TRUE;
 	}
 	glColorMask(ColorMask,  ColorMask,  ColorMask,  AlphaMask);
@@ -1002,7 +1002,7 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 			// Scale the 32-bit value returned by glReadPixels to a 24-bit
 			// value (GC uses a 24-bit Z-buffer).
 			// TODO: in RE0 this value is often off by one, which causes lighting to disappear
-			if(bpmem.zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
+			if(cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
 			{
 				// if Z is in 16 bit format you must return a 16 bit integer
 				z = z >> 16;
@@ -1062,15 +1062,15 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 			PixelEngine::UPEAlphaReadReg alpha_read_mode;
 			PixelEngine::Read16((u16&)alpha_read_mode, PE_ALPHAREAD);
 
-			if (bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
+			if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
 			{
 				color = RGBA8ToRGBA6ToRGBA8(color);
 			}
-			else if (bpmem.zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
+			else if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
 			{
 				color = RGBA8ToRGB565ToRGBA8(color);
 			}
-			if(bpmem.zcontrol.pixel_format != PIXELFMT_RGBA6_Z24)
+			if(cur_bpmem->zcontrol.pixel_format != PIXELFMT_RGBA6_Z24)
 			{
 				color |= 0xFF000000;
 			}
@@ -1105,8 +1105,8 @@ void Renderer::UpdateViewport(Matrix44& vpCorrection)
 	// [4] = yorig + height/2 + 342
 	// [5] = 16777215 * farz
 
-	int scissorXOff = bpmem.scissorOffset.x * 2;
-	int scissorYOff = bpmem.scissorOffset.y * 2;
+	int scissorXOff = cur_bpmem->scissorOffset.x * 2;
+	int scissorYOff = cur_bpmem->scissorOffset.y * 2;
 
 	// TODO: ceil, floor or just cast to int?
 	int X = EFBToScaledX((int)ceil(xfregs.viewport.xOrig - xfregs.viewport.wd - (float)scissorXOff));
@@ -1185,9 +1185,9 @@ void Renderer::SetBlendMode(bool forceUpdate)
 {
 	// Our render target always uses an alpha channel, so we need to override the blend functions to assume a destination alpha of 1 if the render target isn't supposed to have an alpha channel
 	// Example: D3DBLEND_DESTALPHA needs to be D3DBLEND_ONE since the result without an alpha channel is assumed to always be 1.
-	bool target_has_alpha = bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
+	bool target_has_alpha = cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
 	
-	bool useDstAlpha = !g_ActiveConfig.bDstAlphaPass && bpmem.dstalpha.enable && bpmem.blendmode.alphaupdate && target_has_alpha;
+	bool useDstAlpha = !g_ActiveConfig.bDstAlphaPass && cur_bpmem->dstalpha.enable && cur_bpmem->blendmode.alphaupdate && target_has_alpha;
 	bool useDualSource = useDstAlpha && g_ActiveConfig.backend_info.bSupportsDualSourceBlend;
 	
 	const GLenum glSrcFactors[8] =
@@ -1221,15 +1221,15 @@ void Renderer::SetBlendMode(bool forceUpdate)
 	// 6-8 - dstRGB function
 
 	u32 newval = useDualSource << 1;
-	newval |= bpmem.blendmode.subtract << 2;
+	newval |= cur_bpmem->blendmode.subtract << 2;
 
-	if (bpmem.blendmode.subtract)
+	if (cur_bpmem->blendmode.subtract)
 		newval |= 0x0049;   // enable blending src 1 dst 1
-	else if (bpmem.blendmode.blendenable)
+	else if (cur_bpmem->blendmode.blendenable)
 	{
 		newval |= 1;    // enable blending
-		newval |= bpmem.blendmode.srcfactor << 3;
-		newval |= bpmem.blendmode.dstfactor << 6;
+		newval |= cur_bpmem->blendmode.srcfactor << 3;
+		newval |= cur_bpmem->blendmode.dstfactor << 6;
 	}
 
 	u32 changes = forceUpdate ? 0xFFFFFFFF : newval ^ s_blendMode;
@@ -1676,10 +1676,10 @@ void Renderer::RestoreAPIState()
 void Renderer::SetGenerationMode()
 {
 	// none, ccw, cw, ccw
-	if (bpmem.genMode.cullmode > 0)
+	if (cur_bpmem->genMode.cullmode > 0)
 	{
 		glEnable(GL_CULL_FACE);
-		glFrontFace(bpmem.genMode.cullmode == 2 ? GL_CCW : GL_CW);
+		glFrontFace(cur_bpmem->genMode.cullmode == 2 ? GL_CCW : GL_CW);
 	}
 	else
 		glDisable(GL_CULL_FACE);
@@ -1699,11 +1699,11 @@ void Renderer::SetDepthMode()
 		GL_ALWAYS
 	};
 
-	if (bpmem.zmode.testenable)
+	if (cur_bpmem->zmode.testenable)
 	{
 		glEnable(GL_DEPTH_TEST);
-		glDepthMask(bpmem.zmode.updateenable ? GL_TRUE : GL_FALSE);
-		glDepthFunc(glCmpFuncs[bpmem.zmode.func]);
+		glDepthMask(cur_bpmem->zmode.updateenable ? GL_TRUE : GL_FALSE);
+		glDepthFunc(glCmpFuncs[cur_bpmem->zmode.func]);
 	}
 	else
 	{
@@ -1739,10 +1739,10 @@ void Renderer::SetLogicOpMode()
 		GL_SET
 	};
 
-	if (bpmem.blendmode.logicopenable)
+	if (cur_bpmem->blendmode.logicopenable)
 	{
 		glEnable(GL_COLOR_LOGIC_OP);
-		glLogicOp(glLogicOpCodes[bpmem.blendmode.logicmode]);
+		glLogicOp(glLogicOpCodes[cur_bpmem->blendmode.logicmode]);
 	}
 	else
 	{
@@ -1753,7 +1753,7 @@ void Renderer::SetLogicOpMode()
 
 void Renderer::SetDitherMode()
 {
-	if (bpmem.blendmode.dither)
+	if (cur_bpmem->blendmode.dither)
 		glEnable(GL_DITHER);
 	else
 		glDisable(GL_DITHER);
@@ -1763,18 +1763,18 @@ void Renderer::SetLineWidth()
 {
 	float fratio = xfregs.viewport.wd != 0 ?
 		((float)Renderer::GetTargetWidth() / EFB_WIDTH) : 1.0f;
-	if (bpmem.lineptwidth.linesize > 0)
+	if (cur_bpmem->lineptwidth.linesize > 0)
 		// scale by ratio of widths
-		glLineWidth((float)bpmem.lineptwidth.linesize * fratio / 6.0f);
+		glLineWidth((float)cur_bpmem->lineptwidth.linesize * fratio / 6.0f);
 #ifndef USE_GLES3
-	if (bpmem.lineptwidth.pointsize > 0)
-		glPointSize((float)bpmem.lineptwidth.pointsize * fratio / 6.0f);
+	if (cur_bpmem->lineptwidth.pointsize > 0)
+		glPointSize((float)cur_bpmem->lineptwidth.pointsize * fratio / 6.0f);
 #endif
 }
 
 void Renderer::SetSamplerState(int stage, int texindex)
 {
-	auto const& tex = bpmem.tex[texindex];
+	auto const& tex = cur_bpmem->tex[texindex];
 	auto const& tm0 = tex.texMode0[stage];
 	auto const& tm1 = tex.texMode1[stage];
 	

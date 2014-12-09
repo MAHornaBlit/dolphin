@@ -7,3 +7,4 @@
 // STATE_TO_SAVE
 XFRegisters xfregs;
 u32 xfmem[XFMEM_SIZE];
+u32 xfmem2[XFMEM_SIZE];

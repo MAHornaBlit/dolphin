@@ -11,6 +11,8 @@
 
 #include "D3DTexture.h"
 
+extern volatile int g_Eye;
+
 namespace DX11 {
 
 // On the GameCube, the game sends a request for the graphics processor to
@@ -74,16 +76,12 @@ public:
 	static D3DTexture2D* &GetResolvedEFBColorTexture();
 	static D3DTexture2D* &GetResolvedEFBDepthTexture();
 
-	static D3DTexture2D* &GetEFBColorTempTexture() { return m_efb[mEye].color_temp_tex; }
+	static D3DTexture2D* &GetEFBColorTempTexture() { return m_efb[g_Eye].color_temp_tex; }
 	static void SwapReinterpretTexture()
 	{
 		D3DTexture2D* swaptex = GetEFBColorTempTexture();
-		m_efb[mEye].color_temp_tex = GetEFBColorTexture();
-		m_efb[mEye].color_tex = swaptex;
-	}
-	static void SetEye(int eye) 
-	{
-		mEye = eye;
+		m_efb[g_Eye].color_temp_tex = GetEFBColorTexture();
+		m_efb[g_Eye].color_tex = swaptex;
 	}
 
 private:
@@ -106,7 +104,6 @@ private:
 		D3DTexture2D* resolved_color_tex;
 		D3DTexture2D* resolved_depth_tex;
 	} m_efb[2];
-	static unsigned int mEye;
 };
 
 }  // namespace DX11

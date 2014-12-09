@@ -158,8 +158,8 @@ void VertexManager::vFlush()
 {
 #if defined(_DEBUG) || defined(DEBUGFAST) 
 	PRIM_LOG("frame%d:\n texgen=%d, numchan=%d, dualtex=%d, ztex=%d, cole=%d, alpe=%d, ze=%d", g_ActiveConfig.iSaveTargetId, xfregs.numTexGen.numTexGens,
-		xfregs.numChan.numColorChans, xfregs.dualTexTrans.enabled, bpmem.ztex2.op,
-		bpmem.blendmode.colorupdate, bpmem.blendmode.alphaupdate, bpmem.zmode.updateenable);
+		xfregs.numChan.numColorChans, xfregs.dualTexTrans.enabled, cur_bpmem->ztex2.op,
+		cur_bpmem->blendmode.colorupdate, cur_bpmem->blendmode.alphaupdate, cur_bpmem->zmode.updateenable);
 
 	for (unsigned int i = 0; i < xfregs.numChan.numColorChans; ++i) 
 	{
@@ -180,8 +180,8 @@ void VertexManager::vFlush()
 			xfregs.postMtxInfo[i].index, xfregs.postMtxInfo[i].normalize);
 	}
 
-	PRIM_LOG("pixel: tev=%d, ind=%d, texgen=%d, dstalpha=%d, alphatest=0x%x", bpmem.genMode.numtevstages+1, bpmem.genMode.numindstages,
-		bpmem.genMode.numtexgens, (u32)bpmem.dstalpha.enable, (bpmem.alpha_test.hex>>16)&0xff);
+	PRIM_LOG("pixel: tev=%d, ind=%d, texgen=%d, dstalpha=%d, alphatest=0x%x", cur_bpmem->genMode.numtevstages+1, cur_bpmem->genMode.numindstages,
+		cur_bpmem->genMode.numtexgens, (u32)cur_bpmem->dstalpha.enable, (cur_bpmem->alpha_test.hex>>16)&0xff);
 #endif
 
 	(void)GL_REPORT_ERROR();
@@ -198,14 +198,14 @@ void VertexManager::vFlush()
 	GL_REPORT_ERRORD();
 
 	u32 usedtextures = 0;
-	for (u32 i = 0; i < (u32)bpmem.genMode.numtevstages + 1; ++i)
-		if (bpmem.tevorders[i / 2].getEnable(i & 1))
-			usedtextures |= 1 << bpmem.tevorders[i/2].getTexMap(i & 1);
+	for (u32 i = 0; i < (u32)cur_bpmem->genMode.numtevstages + 1; ++i)
+		if (cur_bpmem->tevorders[i / 2].getEnable(i & 1))
+			usedtextures |= 1 << cur_bpmem->tevorders[i/2].getTexMap(i & 1);
 
-	if (bpmem.genMode.numindstages > 0)
-		for (u32 i = 0; i < (u32)bpmem.genMode.numtevstages + 1; ++i)
-			if (bpmem.tevind[i].IsActive() && bpmem.tevind[i].bt < bpmem.genMode.numindstages)
-				usedtextures |= 1 << bpmem.tevindref.getTexMap(bpmem.tevind[i].bt);
+	if (cur_bpmem->genMode.numindstages > 0)
+		for (u32 i = 0; i < (u32)cur_bpmem->genMode.numtevstages + 1; ++i)
+			if (cur_bpmem->tevind[i].IsActive() && cur_bpmem->tevind[i].bt < cur_bpmem->genMode.numindstages)
+				usedtextures |= 1 << cur_bpmem->tevindref.getTexMap(cur_bpmem->tevind[i].bt);
 
 	for (u32 i = 0; i < 8; i++)
 	{
@@ -213,7 +213,7 @@ void VertexManager::vFlush()
 		{
 			TextureCache::SetNextStage(i);
 			g_renderer->SetSamplerState(i % 4, i / 4);
-			FourTexUnits &tex = bpmem.tex[i >> 2];
+			FourTexUnits &tex = cur_bpmem->tex[i >> 2];
 			TextureCache::TCacheEntryBase* tentry = TextureCache::Load(i, 
 				(tex.texImage3[i&3].image_base/* & 0x1FFFFF*/) << 5,
 				tex.texImage0[i&3].width + 1, tex.texImage0[i&3].height + 1,
@@ -233,8 +233,8 @@ void VertexManager::vFlush()
 		}
 	}
 
-	bool useDstAlpha = !g_ActiveConfig.bDstAlphaPass && bpmem.dstalpha.enable && bpmem.blendmode.alphaupdate
-		&& bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
+	bool useDstAlpha = !g_ActiveConfig.bDstAlphaPass && cur_bpmem->dstalpha.enable && cur_bpmem->blendmode.alphaupdate
+		&& cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
 
 	// Makes sure we can actually do Dual source blending
 	bool dualSourcePossible = g_ActiveConfig.backend_info.bSupportsDualSourceBlend;
@@ -268,10 +268,10 @@ void VertexManager::vFlush()
 		g_nativeVertexFmt->SetupVertexPointers();
 	GL_REPORT_ERRORD();
 
-	g_perf_query->EnableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
+	g_perf_query->EnableQuery(cur_bpmem->zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
 	Draw(stride);
-	g_perf_query->DisableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
-	//ERROR_LOG(VIDEO, "PerfQuery result: %d", g_perf_query->GetQueryResult(bpmem.zcontrol.early_ztest ? PQ_ZCOMP_OUTPUT_ZCOMPLOC : PQ_ZCOMP_OUTPUT));
+	g_perf_query->DisableQuery(cur_bpmem->zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
+	//ERROR_LOG(VIDEO, "PerfQuery result: %d", g_perf_query->GetQueryResult(cur_bpmem->zcontrol.early_ztest ? PQ_ZCOMP_OUTPUT_ZCOMPLOC : PQ_ZCOMP_OUTPUT));
 
 	// run through vertex groups again to set alpha
 	if (useDstAlpha && !dualSourcePossible)
@@ -294,7 +294,7 @@ void VertexManager::vFlush()
 		// restore color mask
 		g_renderer->SetColorMask();
 
-		if (bpmem.blendmode.blendenable || bpmem.blendmode.subtract) 
+		if (cur_bpmem->blendmode.blendenable || cur_bpmem->blendmode.subtract) 
 			glEnable(GL_BLEND);
 	}
 	GFX_DEBUGGER_PAUSE_AT(NEXT_FLUSH, true);

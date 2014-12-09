@@ -37,7 +37,7 @@ public:
 
 	void ResetAPIState();
 	void RestoreAPIState();
-	void SetEye(int eye);
+	void ReSetCurrentEyeRT();
 
 	TargetRectangle ConvertEFBRectangle(const EFBRectangle& rc);
 

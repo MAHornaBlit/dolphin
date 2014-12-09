@@ -35,7 +35,7 @@ namespace EfbCopy
 	{
 		if (!g_SWVideoConfig.bHwRasterizer)
 		{
-			u8 *dest_ptr = Memory::GetPointer(bpmem.copyTexDest << 5);
+			u8 *dest_ptr = Memory::GetPointer(cur_bpmem->copyTexDest << 5);
 
 			TextureEncoder::Encode(dest_ptr);
 		}
@@ -43,31 +43,31 @@ namespace EfbCopy
 
 	void ClearEfb()
 	{
-		u32 clearColor = (bpmem.clearcolorAR & 0xff) << 24 | bpmem.clearcolorGB << 8 | (bpmem.clearcolorAR & 0xff00) >> 8;
+		u32 clearColor = (cur_bpmem->clearcolorAR & 0xff) << 24 | cur_bpmem->clearcolorGB << 8 | (cur_bpmem->clearcolorAR & 0xff00) >> 8;
 
-		int left   = bpmem.copyTexSrcXY.x;
-		int top    = bpmem.copyTexSrcXY.y;
-		int right  = left + bpmem.copyTexSrcWH.x;
-		int bottom = top + bpmem.copyTexSrcWH.y;
+		int left   = cur_bpmem->copyTexSrcXY.x;
+		int top    = cur_bpmem->copyTexSrcXY.y;
+		int right  = left + cur_bpmem->copyTexSrcWH.x;
+		int bottom = top + cur_bpmem->copyTexSrcWH.y;
 
 		for (u16 y = top; y <= bottom; y++)
 		{
 			for (u16 x = left; x <= right; x++)
 			{
 				EfbInterface::SetColor(x, y, (u8*)(&clearColor));
-				EfbInterface::SetDepth(x, y, bpmem.clearZValue);
+				EfbInterface::SetDepth(x, y, cur_bpmem->clearZValue);
 			}
 		}
 	}
 
 	void CopyEfb()
 	{
-		if (bpmem.triggerEFBCopy.copy_to_xfb)
+		if (cur_bpmem->triggerEFBCopy.copy_to_xfb)
 			DebugUtil::OnFrameEnd();
 
 		if (!g_bSkipCurrentFrame)
 		{
-			if (bpmem.triggerEFBCopy.copy_to_xfb)
+			if (cur_bpmem->triggerEFBCopy.copy_to_xfb)
 			{
 				CopyToXfb();
 				Core::Callback_VideoCopiedToXFB(true);
@@ -79,7 +79,7 @@ namespace EfbCopy
 				CopyToRam();
 			}
 
-			if (bpmem.triggerEFBCopy.clear)
+			if (cur_bpmem->triggerEFBCopy.clear)
 			{
 				if (g_SWVideoConfig.bHwRasterizer)
 					HwRasterizer::Clear();
@@ -89,7 +89,7 @@ namespace EfbCopy
 		}
 		else
 		{
-			if (bpmem.triggerEFBCopy.copy_to_xfb)
+			if (cur_bpmem->triggerEFBCopy.copy_to_xfb)
 			{
 				// no frame rendered but tell that a frame has finished for frame skip counter
 				Core::Callback_VideoCopiedToXFB(false);

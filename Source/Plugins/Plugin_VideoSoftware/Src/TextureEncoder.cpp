@@ -199,8 +199,8 @@ inline void boxfilterRGB_to_xx8(u8 *src, u8 &x1, u8 &x2, int comp1, int comp2)
 void SetBlockDimensions(int blkWidthLog2, int blkHeightLog2, u16 &sBlkCount, u16 &tBlkCount, u16 &sBlkSize, u16 &tBlkSize)
 {
 	// if half_scale is 1 then the size is cut in half
-	u32 width = bpmem.copyTexSrcWH.x >> bpmem.triggerEFBCopy.half_scale;
-	u32 height = bpmem.copyTexSrcWH.y >> bpmem.triggerEFBCopy.half_scale;
+	u32 width = cur_bpmem->copyTexSrcWH.x >> cur_bpmem->triggerEFBCopy.half_scale;
+	u32 height = cur_bpmem->copyTexSrcWH.y >> cur_bpmem->triggerEFBCopy.half_scale;
 
 	sBlkCount = (width >> blkWidthLog2) + 1;
 	tBlkCount = (height >> blkHeightLog2) + 1;
@@ -212,16 +212,16 @@ void SetBlockDimensions(int blkWidthLog2, int blkHeightLog2, u16 &sBlkCount, u16
 void SetSpans(int sBlkSize, int tBlkSize, s32 &tSpan, s32 &sBlkSpan, s32 &tBlkSpan, s32 &writeStride)
 {
 	// width is 1 less than the number of pixels of width
-	u32 width = bpmem.copyTexSrcWH.x >> bpmem.triggerEFBCopy.half_scale;
+	u32 width = cur_bpmem->copyTexSrcWH.x >> cur_bpmem->triggerEFBCopy.half_scale;
 	u32 alignedWidth = (width + sBlkSize) & (~(sBlkSize-1));
 
-	u32 readStride = 3 << bpmem.triggerEFBCopy.half_scale;
+	u32 readStride = 3 << cur_bpmem->triggerEFBCopy.half_scale;
 
 	tSpan = (640 - sBlkSize) * readStride; // bytes to advance src pointer after each row of texels in a block
 	sBlkSpan = ((-640 * tBlkSize) + sBlkSize) * readStride; // bytes to advance src pointer after each block
 	tBlkSpan = ((640 * tBlkSize) - alignedWidth) * readStride; // bytes to advance src pointer after each row of blocks
 
-	writeStride = bpmem.copyMipMapStrideChannels * 32;
+	writeStride = cur_bpmem->copyMipMapStrideChannels * 32;
 }
 
 #define ENCODE_LOOP_BLOCKS									\
@@ -1386,10 +1386,10 @@ void EncodeZ24halfscale(u8 *dst, u8 *src, u32 format)
 
 void Encode(u8 *dest_ptr)
 {
-	int pixelformat = bpmem.zcontrol.pixel_format;
+	int pixelformat = cur_bpmem->zcontrol.pixel_format;
 	bool bFromZBuffer = pixelformat == PIXELFMT_Z24;
-	bool bIsIntensityFmt = bpmem.triggerEFBCopy.intensity_fmt > 0;
-	u32 copyfmt = ((bpmem.triggerEFBCopy.target_pixel_format / 2) + ((bpmem.triggerEFBCopy.target_pixel_format & 1) * 8));        
+	bool bIsIntensityFmt = cur_bpmem->triggerEFBCopy.intensity_fmt > 0;
+	u32 copyfmt = ((cur_bpmem->triggerEFBCopy.target_pixel_format / 2) + ((cur_bpmem->triggerEFBCopy.target_pixel_format & 1) * 8));        
 
 	// pack copy format information into a single variable
 	u32 format = copyfmt;
@@ -1405,9 +1405,9 @@ void Encode(u8 *dest_ptr)
 		if (copyfmt > GX_TF_RGBA8 || (copyfmt < GX_TF_RGB565 && !bIsIntensityFmt))
 			format |= _GX_TF_CTF;
 
-	u8 *src = EfbInterface::GetPixelPointer(bpmem.copyTexSrcXY.x, bpmem.copyTexSrcXY.y, bFromZBuffer);
+	u8 *src = EfbInterface::GetPixelPointer(cur_bpmem->copyTexSrcXY.x, cur_bpmem->copyTexSrcXY.y, bFromZBuffer);
 
-	if (bpmem.triggerEFBCopy.half_scale)
+	if (cur_bpmem->triggerEFBCopy.half_scale)
 	{
 		if (pixelformat == PIXELFMT_RGBA6_Z24)
 			EncodeRGBA6halfscale(dest_ptr, src, format);

@@ -320,21 +320,21 @@ void VertexManager::DrawVertexArray(int stride)
 void VertexManager::vFlush()
 {
 	u32 usedtextures = 0;
-	for (u32 i = 0; i < (u32)bpmem.genMode.numtevstages + 1; ++i)
-		if (bpmem.tevorders[i / 2].getEnable(i & 1))
-			usedtextures |= 1 << bpmem.tevorders[i/2].getTexMap(i & 1);
+	for (u32 i = 0; i < (u32)cur_bpmem->genMode.numtevstages + 1; ++i)
+		if (cur_bpmem->tevorders[i / 2].getEnable(i & 1))
+			usedtextures |= 1 << cur_bpmem->tevorders[i/2].getTexMap(i & 1);
 
-	if (bpmem.genMode.numindstages > 0)
-		for (unsigned int i = 0; i < bpmem.genMode.numtevstages + 1; ++i)
-			if (bpmem.tevind[i].IsActive() && bpmem.tevind[i].bt < bpmem.genMode.numindstages)
-				usedtextures |= 1 << bpmem.tevindref.getTexMap(bpmem.tevind[i].bt);
+	if (cur_bpmem->genMode.numindstages > 0)
+		for (unsigned int i = 0; i < cur_bpmem->genMode.numtevstages + 1; ++i)
+			if (cur_bpmem->tevind[i].IsActive() && cur_bpmem->tevind[i].bt < cur_bpmem->genMode.numindstages)
+				usedtextures |= 1 << cur_bpmem->tevindref.getTexMap(cur_bpmem->tevind[i].bt);
 
 	for (unsigned int i = 0; i < 8; i++)
 	{
 		if (usedtextures & (1 << i))
 		{
 			g_renderer->SetSamplerState(i & 3, i >> 2);
-			FourTexUnits &tex = bpmem.tex[i >> 2];
+			FourTexUnits &tex = cur_bpmem->tex[i >> 2];
 			TextureCache::TCacheEntryBase* tentry = TextureCache::Load(i, 
 				(tex.texImage3[i&3].image_base/* & 0x1FFFFF*/) << 5,
 				tex.texImage0[i&3].width + 1, tex.texImage0[i&3].height + 1,
@@ -358,8 +358,8 @@ void VertexManager::vFlush()
 	VertexShaderManager::SetConstants();
 	PixelShaderManager::SetConstants(g_nativeVertexFmt->m_components);
 	u32 stride = g_nativeVertexFmt->GetVertexStride();
-	bool useDstAlpha = !g_ActiveConfig.bDstAlphaPass && bpmem.dstalpha.enable && bpmem.blendmode.alphaupdate &&
-		bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
+	bool useDstAlpha = !g_ActiveConfig.bDstAlphaPass && cur_bpmem->dstalpha.enable && cur_bpmem->blendmode.alphaupdate &&
+		cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
 	bool useDualSource = useDstAlpha && g_ActiveConfig.backend_info.bSupportsDualSourceBlend;
 	DSTALPHA_MODE AlphaMode = useDualSource ? DSTALPHA_DUAL_SOURCE_BLEND : DSTALPHA_NONE;	
 
@@ -376,7 +376,7 @@ void VertexManager::vFlush()
 	}
 	PrepareDrawBuffers(stride);
 	g_nativeVertexFmt->SetupVertexPointers();
-	g_perf_query->EnableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
+	g_perf_query->EnableQuery(cur_bpmem->zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
 	if(m_buffers_count)
 	{
 		DrawVertexBuffer(stride);
@@ -385,7 +385,7 @@ void VertexManager::vFlush()
 	{ 
 		DrawVertexArray(stride);
 	}
-	g_perf_query->DisableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
+	g_perf_query->DisableQuery(cur_bpmem->zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
 	if (useDstAlpha && !useDualSource)
 	{
 		if (!PixelShaderCache::SetShader(DSTALPHA_ALPHA_PASS, g_nativeVertexFmt->m_components))

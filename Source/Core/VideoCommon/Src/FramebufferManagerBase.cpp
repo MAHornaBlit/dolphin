@@ -6,16 +6,20 @@
 
 FramebufferManagerBase *g_framebuffer_manager;
 
-XFBSourceBase *FramebufferManagerBase::m_realXFBSource; // Only used in Real XFB mode
-FramebufferManagerBase::VirtualXFBListType FramebufferManagerBase::m_virtualXFBList; // Only used in Virtual XFB mode
-const XFBSourceBase* FramebufferManagerBase::m_overlappingXFBArray[MAX_VIRTUAL_XFB];
+XFBSourceBase *FramebufferManagerBase::m_realXFBSource[2]; // Only used in Real XFB mode
+FramebufferManagerBase::VirtualXFBListType FramebufferManagerBase::m_virtualXFBList1; // Only used in Virtual XFB mode
+FramebufferManagerBase::VirtualXFBListType FramebufferManagerBase::m_virtualXFBList2; // Only used in Virtual XFB mode
+const XFBSourceBase* FramebufferManagerBase::m_overlappingXFBArray[2][MAX_VIRTUAL_XFB];
 
 unsigned int FramebufferManagerBase::s_last_xfb_width = 1;
 unsigned int FramebufferManagerBase::s_last_xfb_height = 1;
 
+extern volatile int g_Eye;
+
 FramebufferManagerBase::FramebufferManagerBase()
 {
-	m_realXFBSource = NULL;
+	m_realXFBSource[0] = NULL;
+	m_realXFBSource[1] = NULL;
 
 	// can't hurt
 	memset(m_overlappingXFBArray, 0, sizeof(m_overlappingXFBArray));
@@ -23,15 +27,27 @@ FramebufferManagerBase::FramebufferManagerBase()
 
 FramebufferManagerBase::~FramebufferManagerBase()
 {
-	VirtualXFBListType::iterator
-		it = m_virtualXFBList.begin(),
-		vlend = m_virtualXFBList.end();
-	for (; it != vlend; ++it)
-		delete it->xfbSource;
+	{
+		VirtualXFBListType::iterator
+			it = m_virtualXFBList1.begin(),
+			vlend = m_virtualXFBList1.end();
+		for (; it != vlend; ++it)
+			delete it->xfbSource;
+	}
 
-	m_virtualXFBList.clear();
+	{
+		VirtualXFBListType::iterator
+			it = m_virtualXFBList2.begin(),
+			vlend = m_virtualXFBList2.end();
+		for (; it != vlend; ++it)
+			delete it->xfbSource;
+	}
 
-	delete m_realXFBSource;
+	m_virtualXFBList1.clear();
+	m_virtualXFBList2.clear();
+
+	delete m_realXFBSource[0];
+	delete m_realXFBSource[1];
 }
 
 const XFBSourceBase* const* FramebufferManagerBase::GetXFBSource(u32 xfbAddr, u32 fbWidth, u32 fbHeight, u32 &xfbCount)
@@ -49,45 +65,47 @@ const XFBSourceBase* const* FramebufferManagerBase::GetRealXFBSource(u32 xfbAddr
 {
 	xfbCount = 1;
 
-	if (!m_realXFBSource)
-		m_realXFBSource = g_framebuffer_manager->CreateXFBSource(fbWidth, fbHeight);
+	if (!m_realXFBSource[g_Eye])
+		m_realXFBSource[g_Eye] = g_framebuffer_manager->CreateXFBSource(fbWidth, fbHeight);
 
-	m_realXFBSource->srcAddr = xfbAddr;
+	m_realXFBSource[g_Eye]->srcAddr = xfbAddr;
 
-	m_realXFBSource->srcWidth = MAX_XFB_WIDTH;
-	m_realXFBSource->srcHeight = MAX_XFB_HEIGHT;
+	m_realXFBSource[g_Eye]->srcWidth = MAX_XFB_WIDTH;
+	m_realXFBSource[g_Eye]->srcHeight = MAX_XFB_HEIGHT;
 
-	m_realXFBSource->texWidth = fbWidth;
-	m_realXFBSource->texHeight = fbHeight;
+	m_realXFBSource[g_Eye]->texWidth = fbWidth;
+	m_realXFBSource[g_Eye]->texHeight = fbHeight;
 
 	// TODO: stuff only used by OGL... :/
 	// OpenGL texture coordinates originate at the lower left, which is why
 	// sourceRc.top = fbHeight and sourceRc.bottom = 0.
-	m_realXFBSource->sourceRc.left = 0;
-	m_realXFBSource->sourceRc.top = fbHeight;
-	m_realXFBSource->sourceRc.right = fbWidth;
-	m_realXFBSource->sourceRc.bottom = 0;
+	m_realXFBSource[g_Eye]->sourceRc.left = 0;
+	m_realXFBSource[g_Eye]->sourceRc.top = fbHeight;
+	m_realXFBSource[g_Eye]->sourceRc.right = fbWidth;
+	m_realXFBSource[g_Eye]->sourceRc.bottom = 0;
 
 	// Decode YUYV data from GameCube RAM
-	m_realXFBSource->DecodeToTexture(xfbAddr, fbWidth, fbHeight);
+	m_realXFBSource[g_Eye]->DecodeToTexture(xfbAddr, fbWidth, fbHeight);
 
-	m_overlappingXFBArray[0] = m_realXFBSource;
-	return &m_overlappingXFBArray[0];
+	m_overlappingXFBArray[g_Eye][0] = m_realXFBSource[g_Eye];
+	return &m_overlappingXFBArray[g_Eye][0];
 }
 
 const XFBSourceBase* const* FramebufferManagerBase::GetVirtualXFBSource(u32 xfbAddr, u32 fbWidth, u32 fbHeight, u32 &xfbCount)
 {
 	xfbCount = 0;
 
-	if (m_virtualXFBList.empty())  // no Virtual XFBs available
+	FramebufferManagerBase::VirtualXFBListType &vxfbl = g_Eye == 0 ? m_virtualXFBList1 : m_virtualXFBList2;
+
+	if (vxfbl.empty())  // no Virtual XFBs available
 		return NULL;
 
 	u32 srcLower = xfbAddr;
 	u32 srcUpper = xfbAddr + 2 * fbWidth * fbHeight;
 
 	VirtualXFBListType::reverse_iterator
-		it = m_virtualXFBList.rbegin(),
-		vlend = m_virtualXFBList.rend();
+		it = vxfbl.rbegin(),
+		vlend = vxfbl.rend();
 	for (; it != vlend; ++it)
 	{
 		VirtualXFB* vxfb = &*it;
@@ -97,12 +115,12 @@ const XFBSourceBase* const* FramebufferManagerBase::GetVirtualXFBSource(u32 xfbA
 
 		if (addrRangesOverlap(srcLower, srcUpper, dstLower, dstUpper))
 		{
-			m_overlappingXFBArray[xfbCount] = vxfb->xfbSource;
+			m_overlappingXFBArray[g_Eye][xfbCount] = vxfb->xfbSource;
 			++xfbCount;
 		}
 	}
 
-	return &m_overlappingXFBArray[0];
+	return &m_overlappingXFBArray[g_Eye][0];
 }
 
 void FramebufferManagerBase::CopyToXFB(u32 xfbAddr, u32 fbWidth, u32 fbHeight, const EFBRectangle& sourceRc,float Gamma)
@@ -117,15 +135,17 @@ void FramebufferManagerBase::CopyToVirtualXFB(u32 xfbAddr, u32 fbWidth, u32 fbHe
 {
 	VirtualXFBListType::iterator vxfb = FindVirtualXFB(xfbAddr, fbWidth, fbHeight);
 
-	if (m_virtualXFBList.end() == vxfb)
+	FramebufferManagerBase::VirtualXFBListType &vxfbl = g_Eye == 0 ? m_virtualXFBList1 : m_virtualXFBList2;
+
+	if (vxfbl.end() == vxfb)
 	{
-		if (m_virtualXFBList.size() < MAX_VIRTUAL_XFB)
+		if (vxfbl.size() < MAX_VIRTUAL_XFB)
 		{
 			// create a new Virtual XFB and place it at the front of the list
 			VirtualXFB v;
 			memset(&v, 0, sizeof v);
-			m_virtualXFBList.push_front(v);
-			vxfb = m_virtualXFBList.begin();
+			vxfbl.push_front(v);
+			vxfb = vxfbl.begin();
 		}
 		else
 		{
@@ -136,8 +156,8 @@ void FramebufferManagerBase::CopyToVirtualXFB(u32 xfbAddr, u32 fbWidth, u32 fbHe
 	//else // replace existing virtual XFB
 
 	// move this Virtual XFB to the front of the list.
-	if (m_virtualXFBList.begin() != vxfb)
-		m_virtualXFBList.splice(m_virtualXFBList.begin(), m_virtualXFBList, vxfb);
+	if (vxfbl.begin() != vxfb)
+		vxfbl.splice(vxfbl.begin(), vxfbl, vxfb);
 
 	unsigned int target_width, target_height;
 	g_framebuffer_manager->GetTargetSize(&target_width, &target_height, sourceRc);
@@ -174,8 +194,10 @@ FramebufferManagerBase::VirtualXFBListType::iterator FramebufferManagerBase::Fin
 	const u32 srcLower = xfbAddr;
 	const u32 srcUpper = xfbAddr + 2 * width * height;
 
-	VirtualXFBListType::iterator it = m_virtualXFBList.begin();
-	for (; it != m_virtualXFBList.end(); ++it)
+	FramebufferManagerBase::VirtualXFBListType &vxfbl = g_Eye == 0 ? m_virtualXFBList1 : m_virtualXFBList2;
+
+	VirtualXFBListType::iterator it = vxfbl.begin();
+	for (; it != vxfbl.end(); ++it)
 	{
 		const u32 dstLower = it->xfbAddr;
 		const u32 dstUpper = it->xfbAddr + 2 * it->xfbWidth * it->xfbHeight;
@@ -189,7 +211,9 @@ FramebufferManagerBase::VirtualXFBListType::iterator FramebufferManagerBase::Fin
 
 void FramebufferManagerBase::ReplaceVirtualXFB()
 {
-	VirtualXFBListType::iterator it = m_virtualXFBList.begin();
+	FramebufferManagerBase::VirtualXFBListType &vxfbl = g_Eye == 0 ? m_virtualXFBList1 : m_virtualXFBList2;
+
+	VirtualXFBListType::iterator it = vxfbl.begin();
 
 	const s32 srcLower = it->xfbAddr;
 	const s32 srcUpper = it->xfbAddr + 2 * it->xfbWidth * it->xfbHeight;
@@ -197,7 +221,7 @@ void FramebufferManagerBase::ReplaceVirtualXFB()
 
 	++it;
 
-	for (; it != m_virtualXFBList.end(); ++it)
+	for (; it != vxfbl.end(); ++it)
 	{
 		s32 dstLower = it->xfbAddr;
 		s32 dstUpper = it->xfbAddr + 2 * it->xfbWidth * it->xfbHeight;

@@ -505,8 +505,8 @@ void TransformTexCoord(const InputVertexData *src, OutputVertexData *dst, bool s
 
 	for (u32 coordNum = 0; coordNum < swxfregs.numTexGens; coordNum++)
 	{
-		dst->texCoords[coordNum][0] *= (bpmem.texcoords[coordNum].s.scale_minus_1 + 1);
-		dst->texCoords[coordNum][1] *= (bpmem.texcoords[coordNum].t.scale_minus_1 + 1);
+		dst->texCoords[coordNum][0] *= (cur_bpmem->texcoords[coordNum].s.scale_minus_1 + 1);
+		dst->texCoords[coordNum][1] *= (cur_bpmem->texcoords[coordNum].t.scale_minus_1 + 1);
 	}
 }
 

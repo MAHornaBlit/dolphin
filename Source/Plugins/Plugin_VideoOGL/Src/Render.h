@@ -59,6 +59,7 @@ public:
 	// TODO: Implement and use these
 	void ApplyState(bool bUseDstAlpha) {}
 	void RestoreState() {}
+	void ReSetCurrentEyeRT() { }
 
 	void RenderText(const char* pstr, int left, int top, u32 color);
 	void DrawDebugInfo();

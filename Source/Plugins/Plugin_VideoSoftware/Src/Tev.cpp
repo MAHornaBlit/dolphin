@@ -129,21 +129,21 @@ void Tev::SetRasColor(int colorChan, int swaptable)
 	case 0: // Color0
 		{
 			u8 *color = Color[0];
-			RasColor[RED_C] = color[bpmem.tevksel[swaptable].swap1];
-			RasColor[GRN_C] = color[bpmem.tevksel[swaptable].swap2];
+			RasColor[RED_C] = color[cur_bpmem->tevksel[swaptable].swap1];
+			RasColor[GRN_C] = color[cur_bpmem->tevksel[swaptable].swap2];
 			swaptable++;
-			RasColor[BLU_C] = color[bpmem.tevksel[swaptable].swap1];
-			RasColor[ALP_C] = color[bpmem.tevksel[swaptable].swap2];
+			RasColor[BLU_C] = color[cur_bpmem->tevksel[swaptable].swap1];
+			RasColor[ALP_C] = color[cur_bpmem->tevksel[swaptable].swap2];
 		}
 		break;
 	case 1: // Color1
 		{
 			u8 *color = Color[1];
-			RasColor[RED_C] = color[bpmem.tevksel[swaptable].swap1];
-			RasColor[GRN_C] = color[bpmem.tevksel[swaptable].swap2];
+			RasColor[RED_C] = color[cur_bpmem->tevksel[swaptable].swap1];
+			RasColor[GRN_C] = color[cur_bpmem->tevksel[swaptable].swap2];
 			swaptable++;
-			RasColor[BLU_C] = color[bpmem.tevksel[swaptable].swap1];
-			RasColor[ALP_C] = color[bpmem.tevksel[swaptable].swap2];
+			RasColor[BLU_C] = color[cur_bpmem->tevksel[swaptable].swap1];
+			RasColor[ALP_C] = color[cur_bpmem->tevksel[swaptable].swap2];
 		}
 		break;
 		case 5: // alpha bump
@@ -422,10 +422,10 @@ static bool AlphaCompare(int alpha, int ref, int comp)
 
 static bool TevAlphaTest(int alpha)
 {
-	bool comp0 = AlphaCompare(alpha, bpmem.alpha_test.ref0, bpmem.alpha_test.comp0);
-	bool comp1 = AlphaCompare(alpha, bpmem.alpha_test.ref1, bpmem.alpha_test.comp1);
+	bool comp0 = AlphaCompare(alpha, cur_bpmem->alpha_test.ref0, cur_bpmem->alpha_test.comp0);
+	bool comp1 = AlphaCompare(alpha, cur_bpmem->alpha_test.ref1, cur_bpmem->alpha_test.comp1);
 
-	switch (bpmem.alpha_test.logic)
+	switch (cur_bpmem->alpha_test.logic)
 	{
 	case 0: return comp0 && comp1;   // and
 	case 1: return comp0 || comp1;   // or
@@ -459,7 +459,7 @@ inline s32 WrapIndirectCoord(s32 coord, int wrapMode)
 
 void Tev::Indirect(unsigned int stageNum, s32 s, s32 t)
 {
-	TevStageIndirect &indirect = bpmem.tevind[stageNum];
+	TevStageIndirect &indirect = cur_bpmem->tevind[stageNum];
 	u8 *indmap = IndirectTex[indirect.bt];
 
 	s32 indcoord[3];
@@ -526,7 +526,7 @@ void Tev::Indirect(unsigned int stageNum, s32 s, s32 t)
 	int indmtxid = indirect.mid & 3;
 	if (indmtxid)
 	{
-		IND_MTX &indmtx = bpmem.indmtx[indmtxid - 1];
+		IND_MTX &indmtx = cur_bpmem->indmtx[indmtxid - 1];
 		int scale = ((u32)indmtx.col0.s0 << 0) |
 					((u32)indmtx.col1.s1 << 2) |
 					((u32)indmtx.col2.s2 << 4);
@@ -577,15 +577,15 @@ void Tev::Draw()
 
 	INCSTAT(swstats.thisFrame.tevPixelsIn);
 
-	for (unsigned int stageNum = 0; stageNum < bpmem.genMode.numindstages; stageNum++)
+	for (unsigned int stageNum = 0; stageNum < cur_bpmem->genMode.numindstages; stageNum++)
 	{
 		int stageNum2 = stageNum >> 1;
 		int stageOdd = stageNum&1;
 
-		u32 texcoordSel = bpmem.tevindref.getTexCoord(stageNum);
-		u32 texmap = bpmem.tevindref.getTexMap(stageNum);
+		u32 texcoordSel = cur_bpmem->tevindref.getTexCoord(stageNum);
+		u32 texmap = cur_bpmem->tevindref.getTexMap(stageNum);
 
-		const TEXSCALE& texscale = bpmem.texscale[stageNum2];
+		const TEXSCALE& texscale = cur_bpmem->texscale[stageNum2];
 		s32 scaleS = stageOdd ? texscale.ss1:texscale.ss0;
 		s32 scaleT = stageOdd ? texscale.ts1:texscale.ts0;
 
@@ -604,16 +604,16 @@ void Tev::Draw()
 #endif
 	}
 
-	for (unsigned int stageNum = 0; stageNum <= bpmem.genMode.numtevstages; stageNum++)
+	for (unsigned int stageNum = 0; stageNum <= cur_bpmem->genMode.numtevstages; stageNum++)
 	{
 		int stageNum2 = stageNum >> 1;
 		int stageOdd = stageNum&1;
-		TwoTevStageOrders &order = bpmem.tevorders[stageNum2];
-		TevKSel &kSel = bpmem.tevksel[stageNum2];
+		TwoTevStageOrders &order = cur_bpmem->tevorders[stageNum2];
+		TevKSel &kSel = cur_bpmem->tevksel[stageNum2];
 
 		// stage combiners
-		TevStageCombiner::ColorCombiner &cc = bpmem.combiners[stageNum].colorC;
-		TevStageCombiner::AlphaCombiner &ac = bpmem.combiners[stageNum].alphaC;
+		TevStageCombiner::ColorCombiner &cc = cur_bpmem->combiners[stageNum].colorC;
+		TevStageCombiner::AlphaCombiner &ac = cur_bpmem->combiners[stageNum].alphaC;
 
 		int texcoordSel = order.getTexCoord(stageOdd);
 		int texmap = order.getTexMap(stageOdd);
@@ -635,11 +635,11 @@ void Tev::Draw()
 
 			int swaptable = ac.tswap * 2;
 
-			TexColor[RED_C] = texel[bpmem.tevksel[swaptable].swap1];
-			TexColor[GRN_C] = texel[bpmem.tevksel[swaptable].swap2];
+			TexColor[RED_C] = texel[cur_bpmem->tevksel[swaptable].swap1];
+			TexColor[GRN_C] = texel[cur_bpmem->tevksel[swaptable].swap2];
 			swaptable++;
-			TexColor[BLU_C] = texel[bpmem.tevksel[swaptable].swap1];
-			TexColor[ALP_C] = texel[bpmem.tevksel[swaptable].swap2];
+			TexColor[BLU_C] = texel[cur_bpmem->tevksel[swaptable].swap1];
+			TexColor[ALP_C] = texel[cur_bpmem->tevksel[swaptable].swap2];
 		}
 
 		// set konst for this stage
@@ -694,18 +694,18 @@ void Tev::Draw()
 	// convert to 8 bits per component
 	// the results of the last tev stage are put onto the screen,
 	// regardless of the used destination register - TODO: Verify!
-	u32 color_index = bpmem.combiners[bpmem.genMode.numtevstages].colorC.dest;
-	u32 alpha_index = bpmem.combiners[bpmem.genMode.numtevstages].alphaC.dest;
+	u32 color_index = cur_bpmem->combiners[cur_bpmem->genMode.numtevstages].colorC.dest;
+	u32 alpha_index = cur_bpmem->combiners[cur_bpmem->genMode.numtevstages].alphaC.dest;
 	u8 output[4] = {(u8)Reg[alpha_index][ALP_C], (u8)Reg[color_index][BLU_C], (u8)Reg[color_index][GRN_C], (u8)Reg[color_index][RED_C]};
 
 	if (!TevAlphaTest(output[ALP_C]))
 		return;
 
 	// z texture
-	if (bpmem.ztex2.op)
+	if (cur_bpmem->ztex2.op)
 	{
-		u32 ztex = bpmem.ztex1.bias;
-		switch (bpmem.ztex2.type)
+		u32 ztex = cur_bpmem->ztex1.bias;
+		switch (cur_bpmem->ztex2.type)
 		{
 			case 0: // 8 bit
 				ztex += TexColor[ALP_C];
@@ -718,57 +718,57 @@ void Tev::Draw()
 				break;
 		}
 
-		if (bpmem.ztex2.op == ZTEXTURE_ADD)
+		if (cur_bpmem->ztex2.op == ZTEXTURE_ADD)
 			ztex += Position[2];
 
 		Position[2] = ztex & 0x00ffffff;
 	}
 
 	// fog
-	if (bpmem.fog.c_proj_fsel.fsel)
+	if (cur_bpmem->fog.c_proj_fsel.fsel)
 	{
 		float ze;
 
-		if (bpmem.fog.c_proj_fsel.proj == 0)
+		if (cur_bpmem->fog.c_proj_fsel.proj == 0)
 		{
 			// perspective
 			// ze = A/(B - (Zs >> B_SHF))
-			s32 denom = bpmem.fog.b_magnitude - (Position[2] >> bpmem.fog.b_shift);
+			s32 denom = cur_bpmem->fog.b_magnitude - (Position[2] >> cur_bpmem->fog.b_shift);
 			//in addition downscale magnitude and zs to 0.24 bits
-			ze = (bpmem.fog.a.GetA() * 16777215.0f) / (float)denom;
+			ze = (cur_bpmem->fog.a.GetA() * 16777215.0f) / (float)denom;
 		} 
 		else 
 		{
 			// orthographic
 			// ze = a*Zs
 			//in addition downscale zs to 0.24 bits
-			ze = bpmem.fog.a.GetA() * ((float)Position[2] / 16777215.0f);
+			ze = cur_bpmem->fog.a.GetA() * ((float)Position[2] / 16777215.0f);
 
 		}
 
-		if(bpmem.fogRange.Base.Enabled)
+		if(cur_bpmem->fogRange.Base.Enabled)
 		{
 			// TODO: This is untested and should definitely be checked against real hw.
 			// - No idea if offset is really normalized against the viewport width or against the projection matrix or yet something else
 			// - scaling of the "k" coefficient isn't clear either.
 
 			// First, calculate the offset from the viewport center (normalized to 0..1)
-			float offset = (Position[0] - (bpmem.fogRange.Base.Center - 342)) / (float)swxfregs.viewport.wd;
+			float offset = (Position[0] - (cur_bpmem->fogRange.Base.Center - 342)) / (float)swxfregs.viewport.wd;
 			// Based on that, choose the index such that points which are far away from the z-axis use the 10th "k" value and such that central points use the first value.
 			int index = (int) (9 - std::abs(offset) * 9.f);
 			index = (index < 0) ? 0 : (index > 9) ? 9 : index; // TODO: Shouldn't be necessary!
 			// Look up coefficient... Seems like multiplying by 4 makes Fortune Street work properly (fog is too strong without the factor)
-			float k = bpmem.fogRange.K[index/2].GetValue(index%2) * 4.f;
+			float k = cur_bpmem->fogRange.K[index/2].GetValue(index%2) * 4.f;
 			float x_adjust = sqrt(offset*offset + k*k)/k;
 			ze *= x_adjust; // NOTE: This is basically dividing by a cosine (hidden behind GXInitFogAdjTable): 1/cos = c/b = sqrt(a^2+b^2)/b
 		}
 
-		ze -= bpmem.fog.c_proj_fsel.GetC();
+		ze -= cur_bpmem->fog.c_proj_fsel.GetC();
 
 		// clamp 0 to 1
 		float fog = (ze<0.0f) ? 0.0f : ((ze>1.0f) ? 1.0f : ze);
 
-		switch (bpmem.fog.c_proj_fsel.fsel)
+		switch (cur_bpmem->fog.c_proj_fsel.fsel)
 		{
 			case 4: // exp
 				fog = 1.0f - pow(2.0f, -8.0f * fog);
@@ -790,13 +790,13 @@ void Tev::Draw()
 		u32 fogInt = (u32)(fog * 256);
 		u32 invFog = 256 - fogInt;
 
-		output[RED_C] = (output[RED_C] * invFog + fogInt * bpmem.fog.color.r) >> 8;
-		output[GRN_C] = (output[GRN_C] * invFog + fogInt * bpmem.fog.color.g) >> 8;
-		output[BLU_C] = (output[BLU_C] * invFog + fogInt * bpmem.fog.color.b) >> 8;
+		output[RED_C] = (output[RED_C] * invFog + fogInt * cur_bpmem->fog.color.r) >> 8;
+		output[GRN_C] = (output[GRN_C] * invFog + fogInt * cur_bpmem->fog.color.g) >> 8;
+		output[BLU_C] = (output[BLU_C] * invFog + fogInt * cur_bpmem->fog.color.b) >> 8;
 	}
 
-	bool late_ztest = !bpmem.zcontrol.early_ztest || !g_SWVideoConfig.bZComploc;
-	if (late_ztest && bpmem.zmode.testenable)
+	bool late_ztest = !cur_bpmem->zcontrol.early_ztest || !g_SWVideoConfig.bZComploc;
+	if (late_ztest && cur_bpmem->zmode.testenable)
 	{
 		// TODO: Check against hw if these values get incremented even if depth testing is disabled
 		SWPixelEngine::pereg.IncZInputQuadCount(false);
@@ -810,17 +810,17 @@ void Tev::Draw()
 #if ALLOW_TEV_DUMPS
 	if (g_SWVideoConfig.bDumpTevStages)
 	{
-		for (u32 i = 0; i < bpmem.genMode.numindstages; ++i)
+		for (u32 i = 0; i < cur_bpmem->genMode.numindstages; ++i)
 			DebugUtil::CopyTempBuffer(Position[0], Position[1], INDIRECT, i, "Indirect");
-		for (u32 i = 0; i <= bpmem.genMode.numtevstages; ++i)
+		for (u32 i = 0; i <= cur_bpmem->genMode.numtevstages; ++i)
 			DebugUtil::CopyTempBuffer(Position[0], Position[1], DIRECT, i, "Stage");
 	}
 
 	if (g_SWVideoConfig.bDumpTevTextureFetches)
 	{
-		for (u32 i = 0; i <= bpmem.genMode.numtevstages; ++i)
+		for (u32 i = 0; i <= cur_bpmem->genMode.numtevstages; ++i)
 		{
-			TwoTevStageOrders &order = bpmem.tevorders[i >> 1];
+			TwoTevStageOrders &order = cur_bpmem->tevorders[i >> 1];
 			if (order.getEnable(i & 1))
 				DebugUtil::CopyTempBuffer(Position[0], Position[1], DIRECT_TFETCH, i, "TFetch");
 		}

@@ -357,7 +357,7 @@ void XFBEncoder::Encode(u8* dst, u32 width, u32 height, const EFBRectangle& srcR
 	for (unsigned int y = 0; y < height; ++y)
 	{
 		memcpy(dst, src, 2*width);
-		dst += bpmem.copyMipMapStrideChannels*32;
+		dst += cur_bpmem->copyMipMapStrideChannels*32;
 		src += map.RowPitch;
 	}
 

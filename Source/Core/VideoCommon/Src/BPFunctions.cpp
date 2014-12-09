@@ -33,11 +33,11 @@ void SetGenerationMode()
 
 void SetScissor()
 {
-	const int xoff = bpmem.scissorOffset.x * 2 - 342;
-	const int yoff = bpmem.scissorOffset.y * 2 - 342;
+	const int xoff = cur_bpmem->scissorOffset.x * 2 - 342;
+	const int yoff = cur_bpmem->scissorOffset.y * 2 - 342;
 
-	EFBRectangle rc (bpmem.scissorTL.x - xoff - 342, bpmem.scissorTL.y - yoff - 342,
-					bpmem.scissorBR.x - xoff - 341, bpmem.scissorBR.y - yoff - 341);
+	EFBRectangle rc (cur_bpmem->scissorTL.x - xoff - 342, cur_bpmem->scissorTL.y - yoff - 342,
+					cur_bpmem->scissorBR.x - xoff - 341, cur_bpmem->scissorBR.y - yoff - 341);
 
 	if (rc.left < 0) rc.left = 0;
 	if (rc.top < 0) rc.top = 0;
@@ -84,7 +84,7 @@ void SetColorMask()
 void CopyEFB(u32 dstAddr, unsigned int dstFormat, unsigned int srcFormat,
 	const EFBRectangle& srcRect, bool isIntensity, bool scaleByHalf)
 {
-	// bpmem.zcontrol.pixel_format to PIXELFMT_Z24 is when the game wants to copy from ZBuffer (Zbuffer uses 24-bit Format)
+	// cur_bpmem->zcontrol.pixel_format to PIXELFMT_Z24 is when the game wants to copy from ZBuffer (Zbuffer uses 24-bit Format)
 	if (g_ActiveConfig.bEFBCopyEnable)
 	{
 		TextureCache::CopyRenderTargetToTexture(dstAddr, dstFormat, srcFormat,
@@ -110,29 +110,29 @@ void CopyEFB(u32 dstAddr, unsigned int dstFormat, unsigned int srcFormat,
 */
 void ClearScreen(const EFBRectangle &rc)
 {
-	bool colorEnable = bpmem.blendmode.colorupdate;
-	bool alphaEnable = bpmem.blendmode.alphaupdate;
-	bool zEnable = bpmem.zmode.updateenable;
+	bool colorEnable = cur_bpmem->blendmode.colorupdate;
+	bool alphaEnable = cur_bpmem->blendmode.alphaupdate;
+	bool zEnable = cur_bpmem->zmode.updateenable;
 
 	// (1): Disable unused color channels
-	if (bpmem.zcontrol.pixel_format == PIXELFMT_RGB8_Z24 ||
-		bpmem.zcontrol.pixel_format == PIXELFMT_RGB565_Z16 ||
-		bpmem.zcontrol.pixel_format == PIXELFMT_Z24)
+	if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB8_Z24 ||
+		cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB565_Z16 ||
+		cur_bpmem->zcontrol.pixel_format == PIXELFMT_Z24)
 	{
 		alphaEnable = false;
 	}
 
 	if (colorEnable || alphaEnable || zEnable)
 	{
-		u32 color = (bpmem.clearcolorAR << 16) | bpmem.clearcolorGB;
-		u32 z = bpmem.clearZValue;
+		u32 color = (cur_bpmem->clearcolorAR << 16) | cur_bpmem->clearcolorGB;
+		u32 z = cur_bpmem->clearZValue;
 
 		// (2) drop additional accuracy
-		if (bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
+		if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
 		{
 			color = RGBA8ToRGBA6ToRGBA8(color);
 		}
-		else if (bpmem.zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
+		else if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
 		{
 			color = RGBA8ToRGB565ToRGBA8(color);
 			z = Z24ToZ16ToZ24(z);
@@ -159,7 +159,7 @@ void OnPixelFormatChange()
 		return;
 
 	u32 old_format = Renderer::GetPrevPixelFormat();
-	u32 new_format = bpmem.zcontrol.pixel_format;
+	u32 new_format = cur_bpmem->zcontrol.pixel_format;
 
 	// no need to reinterpret pixel data in these cases
 	if (new_format == old_format || old_format == (unsigned int)-1)
@@ -209,7 +209,7 @@ void OnPixelFormatChange()
 	g_renderer->ReinterpretPixelData(convtype);
 
 skip:
-	DEBUG_LOG(VIDEO, "pixelfmt: pixel=%d, zc=%d", new_format, bpmem.zcontrol.zformat);
+	DEBUG_LOG(VIDEO, "pixelfmt: pixel=%d, zc=%d", new_format, cur_bpmem->zcontrol.zformat);
 
 	Renderer::StorePixelFormat(new_format);
 }
@@ -248,12 +248,12 @@ void SetInterlacingMode(const BPCmd &bp)
 	{
 	case BPMEM_FIELDMODE:
 		{
-			// SDK always sets bpmem.lineptwidth.lineaspect via BPMEM_LINEPTWIDTH
+			// SDK always sets cur_bpmem->lineptwidth.lineaspect via BPMEM_LINEPTWIDTH
 			// just before this cmd
 			const char *action[] = { "don't adjust", "adjust" };
 			DEBUG_LOG(VIDEO, "BPMEM_FIELDMODE texLOD:%s lineaspect:%s",
-				action[bpmem.fieldmode.texLOD],
-				action[bpmem.lineptwidth.lineaspect]);
+				action[cur_bpmem->fieldmode.texLOD],
+				action[cur_bpmem->lineptwidth.lineaspect]);
 		}
 		break;
 	case BPMEM_FIELDMASK:
@@ -261,7 +261,7 @@ void SetInterlacingMode(const BPCmd &bp)
 			// Determines if fields will be written to EFB (always computed)
 			const char *action[] = { "skip", "write" };
 			DEBUG_LOG(VIDEO, "BPMEM_FIELDMASK even:%s odd:%s",
-				action[bpmem.fieldmask.even], action[bpmem.fieldmask.odd]);
+				action[cur_bpmem->fieldmask.even], action[cur_bpmem->fieldmask.odd]);
 		}
 		break;
 	default:

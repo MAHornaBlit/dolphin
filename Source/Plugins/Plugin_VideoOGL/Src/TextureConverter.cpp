@@ -254,7 +254,7 @@ void EncodeToRamUsingShader(GLuint srcTexture, const TargetRectangle& sourceRc,
 	// .. and then read back the results.
 	// TODO: make this less slow.
 
-	int writeStride = bpmem.copyMipMapStrideChannels * 32;
+	int writeStride = cur_bpmem->copyMipMapStrideChannels * 32;
 
 	if (writeStride != readStride && toTexture)
 	{

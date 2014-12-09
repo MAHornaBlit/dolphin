@@ -34,6 +34,8 @@
 #include "ConfigManager.h"
 #include <strsafe.h>
 
+extern volatile int g_Eye;
+
 namespace DX11
 {
 
@@ -51,7 +53,6 @@ ID3D11DepthStencilState* resetdepthstate = NULL;
 ID3D11RasterizerState* resetraststate = NULL;
 
 static ID3D11Texture2D* s_screenshot_texture = NULL;
-
 
 // GX pipeline state
 struct
@@ -311,11 +312,11 @@ void Renderer::SetColorMask()
 {
 	// Only enable alpha channel if it's supported by the current EFB format
 	UINT8 color_mask = 0;
-	if (bpmem.alpha_test.TestResult() != AlphaTest::FAIL)
+	if (cur_bpmem->alpha_test.TestResult() != AlphaTest::FAIL)
 	{
-		if (bpmem.blendmode.alphaupdate && (bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24))
+		if (cur_bpmem->blendmode.alphaupdate && (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24))
 			color_mask = D3D11_COLOR_WRITE_ENABLE_ALPHA;
-		if (bpmem.blendmode.colorupdate)
+		if (cur_bpmem->blendmode.colorupdate)
 			color_mask |= D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE;
 	}
 	gx_state.blenddc.RenderTarget[0].RenderTargetWriteMask = color_mask;
@@ -410,7 +411,7 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 
 		float val = *(float*)map.pData;
 		u32 ret = 0;
-		if(bpmem.zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
+		if(cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
 		{
 			// if Z is in 16 bit format you must return a 16 bit integer
 			ret = ((u32)(val * 0xffff));
@@ -442,15 +443,15 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
 		PixelEngine::UPEAlphaReadReg alpha_read_mode;
 		PixelEngine::Read16((u16&)alpha_read_mode, PE_ALPHAREAD);
 
-		if (bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
+		if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24)
 		{
 			ret = RGBA8ToRGBA6ToRGBA8(ret);
 		}
-		else if (bpmem.zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
+		else if (cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGB565_Z16)
 		{
 			ret = RGBA8ToRGB565ToRGBA8(ret);
 		}			
-		if(bpmem.zcontrol.pixel_format != PIXELFMT_RGBA6_Z24)
+		if(cur_bpmem->zcontrol.pixel_format != PIXELFMT_RGBA6_Z24)
 		{
 			ret |= 0xFF000000;
 		}
@@ -510,8 +511,8 @@ void Renderer::UpdateViewport(Matrix44& vpCorrection)
 	// [4] = yorig + height/2 + 342
 	// [5] = 16777215 * farz
 
-	int scissorXOff = bpmem.scissorOffset.x * 2;
-	int scissorYOff = bpmem.scissorOffset.y * 2;
+	int scissorXOff = cur_bpmem->scissorOffset.x * 2;
+	int scissorYOff = cur_bpmem->scissorOffset.y * 2;
 
 	// TODO: ceil, floor or just cast to int?
 	// TODO: Directly use the floats instead of rounding them?
@@ -572,7 +573,7 @@ void Renderer::ClearScreen(const EFBRectangle& rc, bool colorEnable, bool alphaE
 	else D3D::stateman->PushBlendState(clearblendstates[3]);
 
 	// TODO: Should we enable Z testing here?
-	/*if (!bpmem.zmode.testenable) D3D::stateman->PushDepthState(cleardepthstates[0]);
+	/*if (!cur_bpmem->zmode.testenable) D3D::stateman->PushDepthState(cleardepthstates[0]);
 	else */if (zEnable) D3D::stateman->PushDepthState(cleardepthstates[1]);
 	else /*if (!zEnable)*/ D3D::stateman->PushDepthState(cleardepthstates[2]);
 
@@ -675,7 +676,7 @@ void Renderer::SetBlendMode(bool forceUpdate)
 {
 	// Our render target always uses an alpha channel, so we need to override the blend functions to assume a destination alpha of 1 if the render target isn't supposed to have an alpha channel
 	// Example: D3DBLEND_DESTALPHA needs to be D3DBLEND_ONE since the result without an alpha channel is assumed to always be 1.
-	bool target_has_alpha = bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
+	bool target_has_alpha = cur_bpmem->zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
 	const D3D11_BLEND d3dSrcFactors[8] =
 	{
 		D3D11_BLEND_ZERO,
@@ -699,10 +700,10 @@ void Renderer::SetBlendMode(bool forceUpdate)
 		(target_has_alpha) ? D3D11_BLEND_INV_DEST_ALPHA : D3D11_BLEND_ZERO
 	};
 
-	if (bpmem.blendmode.logicopenable && !forceUpdate)
+	if (cur_bpmem->blendmode.logicopenable && !forceUpdate)
 		return;
 
-	if (bpmem.blendmode.subtract)
+	if (cur_bpmem->blendmode.subtract)
 	{
 		gx_state.blenddc.RenderTarget[0].BlendEnable = true;
 		SetBlendOp(D3D11_BLEND_OP_REV_SUBTRACT);
@@ -711,12 +712,12 @@ void Renderer::SetBlendMode(bool forceUpdate)
 	}
 	else
 	{
-		gx_state.blenddc.RenderTarget[0].BlendEnable = bpmem.blendmode.blendenable;
-		if (bpmem.blendmode.blendenable)
+		gx_state.blenddc.RenderTarget[0].BlendEnable = cur_bpmem->blendmode.blendenable;
+		if (cur_bpmem->blendmode.blendenable)
 		{
 			SetBlendOp(D3D11_BLEND_OP_ADD);
-			SetSrcBlend(d3dSrcFactors[bpmem.blendmode.srcfactor]);
-			SetDestBlend(d3dDestFactors[bpmem.blendmode.dstfactor]);
+			SetSrcBlend(d3dSrcFactors[cur_bpmem->blendmode.srcfactor]);
+			SetDestBlend(d3dDestFactors[cur_bpmem->blendmode.dstfactor]);
 		}
 	}
 }
@@ -788,17 +789,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	}
 
 	if (field == FIELD_LOWER) xfbAddr -= fbWidth * 2;
-	u32 xfbCount = 0;
-	const XFBSourceBase* const* xfbSourceList = FramebufferManager::GetXFBSource(xfbAddr, fbWidth, fbHeight, xfbCount);
-	if ((!xfbSourceList || xfbCount == 0) && g_ActiveConfig.bUseXFB && !g_ActiveConfig.bUseRealXFB)
-	{
-		if (g_ActiveConfig.bDumpFrames && !frame_data.empty())
-			AVIDump::AddFrame(&frame_data[0], fbWidth, fbHeight);
-
-		Core::Callback_VideoCopiedToXFB(false);
-		return;
-	}
-
+	
 	ResetAPIState();
 
 	// Prepare to copy the XFBs to our backbuffer
@@ -822,7 +813,17 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	for (int eye = 0; eye < 2; ++eye)
 	{
 		//Readjust viewport for eye
-		FramebufferManager::SetEye(eye);
+		g_Eye=eye;
+
+
+		u32 xfbCount = 0;
+		const XFBSourceBase* const* xfbSourceList = FramebufferManager::GetXFBSource(xfbAddr, fbWidth, fbHeight, xfbCount);
+		if ((!xfbSourceList || xfbCount == 0) && g_ActiveConfig.bUseXFB && !g_ActiveConfig.bUseRealXFB)
+		{
+			Core::Callback_VideoCopiedToXFB(false);
+			return;
+		}
+
 		X = 0;
 		Y = (s_backbuffer_height - Height) / 2;
 		Width = s_backbuffer_width / 2;
@@ -1089,10 +1090,16 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	D3D::BeginFrame();
 	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
 	VertexShaderManager::SetViewportChanged();
-	FramebufferManager::SetEye(0);
+	g_Eye=0;
 
 	Core::Callback_VideoCopiedToXFB(XFBWrited || (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB));
 	XFBWrited = false;
+}
+
+void Renderer::ReSetCurrentEyeRT()
+{
+	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(),
+		FramebufferManager::GetEFBDepthTexture()->GetDSV());
 }
 
 // ALWAYS call RestoreAPIState for each ResetAPIState call you're doing
@@ -1101,11 +1108,6 @@ void Renderer::ResetAPIState()
 	D3D::stateman->PushBlendState(resetblendstate);
 	D3D::stateman->PushDepthState(resetdepthstate);
 	D3D::stateman->PushRasterizerState(resetraststate);
-}
-
-void Renderer::SetEye(int eye)
-{
-	FramebufferManager::SetEye(eye);
 }
 
 void Renderer::RestoreAPIState()
@@ -1238,7 +1240,7 @@ void Renderer::SetGenerationMode()
 	};
 
 	// rastdc.FrontCounterClockwise must be false for this to work
-	gx_state.rastdc.CullMode = d3dCullModes[bpmem.genMode.cullmode];
+	gx_state.rastdc.CullMode = d3dCullModes[cur_bpmem->genMode.cullmode];
 }
 
 void Renderer::SetDepthMode()
@@ -1255,11 +1257,11 @@ void Renderer::SetDepthMode()
 		D3D11_COMPARISON_ALWAYS
 	};
 
-	if (bpmem.zmode.testenable)
+	if (cur_bpmem->zmode.testenable)
 	{
 		gx_state.depthdc.DepthEnable = TRUE;
-		gx_state.depthdc.DepthWriteMask = bpmem.zmode.updateenable ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
-		gx_state.depthdc.DepthFunc = d3dCmpFuncs[bpmem.zmode.func];
+		gx_state.depthdc.DepthWriteMask = cur_bpmem->zmode.updateenable ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
+		gx_state.depthdc.DepthFunc = d3dCmpFuncs[cur_bpmem->zmode.func];
 	}
 	else
 	{
@@ -1348,12 +1350,12 @@ void Renderer::SetLogicOpMode()
 		D3D11_BLEND_ONE//15
 	};
 
-	if (bpmem.blendmode.logicopenable)
+	if (cur_bpmem->blendmode.logicopenable)
 	{
 		gx_state.blenddc.RenderTarget[0].BlendEnable = true;
-		SetBlendOp(d3dLogicOps[bpmem.blendmode.logicmode]);
-		SetSrcBlend(d3dLogicOpSrcFactors[bpmem.blendmode.logicmode]);
-		SetDestBlend(d3dLogicOpDestFactors[bpmem.blendmode.logicmode]);
+		SetBlendOp(d3dLogicOps[cur_bpmem->blendmode.logicmode]);
+		SetSrcBlend(d3dLogicOpSrcFactors[cur_bpmem->blendmode.logicmode]);
+		SetDestBlend(d3dLogicOpDestFactors[cur_bpmem->blendmode.logicmode]);
 	}
 	else
 	{
@@ -1363,7 +1365,7 @@ void Renderer::SetLogicOpMode()
 
 void Renderer::SetDitherMode()
 {
-	// TODO: Set dither mode to bpmem.blendmode.dither
+	// TODO: Set dither mode to cur_bpmem->blendmode.dither
 }
 
 void Renderer::SetLineWidth()
@@ -1391,7 +1393,7 @@ void Renderer::SetSamplerState(int stage, int texindex)
 		D3D11_TEXTURE_ADDRESS_WRAP //reserved
 	};
 
-	const FourTexUnits &tex = bpmem.tex[texindex];
+	const FourTexUnits &tex = cur_bpmem->tex[texindex];
 	const TexMode0 &tm0 = tex.texMode0[stage];
 	const TexMode1 &tm1 = tex.texMode1[stage];
 	

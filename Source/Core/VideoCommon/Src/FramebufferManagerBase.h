@@ -89,10 +89,11 @@ private:
 	static const XFBSourceBase* const* GetRealXFBSource(u32 xfbAddr, u32 fbWidth, u32 fbHeight, u32 &xfbCount);
 	static const XFBSourceBase* const* GetVirtualXFBSource(u32 xfbAddr, u32 fbWidth, u32 fbHeight, u32 &xfbCount);
 
-	static XFBSourceBase *m_realXFBSource; // Only used in Real XFB mode
-	static VirtualXFBListType m_virtualXFBList; // Only used in Virtual XFB mode
+	static XFBSourceBase *m_realXFBSource[2]; // Only used in Real XFB mode
+	static VirtualXFBListType m_virtualXFBList1; // Only used in Virtual XFB mode
+	static VirtualXFBListType m_virtualXFBList2; // Only used in Virtual XFB mode
 
-	static const XFBSourceBase* m_overlappingXFBArray[MAX_VIRTUAL_XFB];
+	static const XFBSourceBase* m_overlappingXFBArray[2][MAX_VIRTUAL_XFB];
 
 	static unsigned int s_last_xfb_width;
 	static unsigned int s_last_xfb_height;

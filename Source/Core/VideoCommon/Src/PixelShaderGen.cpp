@@ -20,9 +20,9 @@
 
 //   old tev->pixelshader notes
 //
-//   color for this stage (alpha, color) is given by bpmem.tevorders[0].colorchan0
-//   konstant for this stage (alpha, color) is given by bpmem.tevksel
-//   inputs are given by bpmem.combiners[0].colorC.a/b/c/d     << could be current channel color
+//   color for this stage (alpha, color) is given by cur_bpmem->tevorders[0].colorchan0
+//   konstant for this stage (alpha, color) is given by cur_bpmem->tevksel
+//   inputs are given by cur_bpmem->combiners[0].colorC.a/b/c/d     << could be current channel color
 //   according to GXTevColorArg table above
 //   output is given by .outreg
 //   tevtemp is set according to swapmodetables and
@@ -242,20 +242,20 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 	if (is_writing_shadercode)
 		text[sizeof(text) - 1] = 0x7C;  // canary
 
-	unsigned int numStages = bpmem.genMode.numtevstages + 1;
-	unsigned int numTexgen = bpmem.genMode.numtexgens;
+	unsigned int numStages = cur_bpmem->genMode.numtevstages + 1;
+	unsigned int numTexgen = cur_bpmem->genMode.numtexgens;
 
-	const bool forced_early_z = g_ActiveConfig.backend_info.bSupportsEarlyZ && bpmem.UseEarlyDepthTest() && (g_ActiveConfig.bFastDepthCalc || bpmem.alpha_test.TestResult() == AlphaTest::UNDETERMINED);
-	const bool per_pixel_depth = (bpmem.ztex2.op != ZTEXTURE_DISABLE && bpmem.UseLateDepthTest()) || (!g_ActiveConfig.bFastDepthCalc && bpmem.zmode.testenable && !forced_early_z);
+	const bool forced_early_z = g_ActiveConfig.backend_info.bSupportsEarlyZ && cur_bpmem->UseEarlyDepthTest() && (g_ActiveConfig.bFastDepthCalc || cur_bpmem->alpha_test.TestResult() == AlphaTest::UNDETERMINED);
+	const bool per_pixel_depth = (cur_bpmem->ztex2.op != ZTEXTURE_DISABLE && cur_bpmem->UseLateDepthTest()) || (!g_ActiveConfig.bFastDepthCalc && cur_bpmem->zmode.testenable && !forced_early_z);
 
 	out.Write("//Pixel Shader for TEV stages\n");
 	out.Write("//%i TEV stages, %i texgens, %i IND stages\n",
-		numStages, numTexgen, bpmem.genMode.numindstages);
+		numStages, numTexgen, cur_bpmem->genMode.numindstages);
 
 	uid_data.dstAlphaMode = dstAlphaMode;
-	uid_data.genMode_numindstages = bpmem.genMode.numindstages;
-	uid_data.genMode_numtevstages = bpmem.genMode.numtevstages;
-	uid_data.genMode_numtexgens = bpmem.genMode.numtexgens;
+	uid_data.genMode_numindstages = cur_bpmem->genMode.numindstages;
+	uid_data.genMode_numtevstages = cur_bpmem->genMode.numtevstages;
+	uid_data.genMode_numtexgens = cur_bpmem->genMode.numtexgens;
 
 	if (ApiType == API_OPENGL)
 	{
@@ -359,7 +359,7 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 			// It just allows it, but it seems that all drivers do.
 			out.Write("layout(early_fragment_tests) in;\n");
 		}
-		else if (bpmem.UseEarlyDepthTest() && (g_ActiveConfig.bFastDepthCalc || bpmem.alpha_test.TestResult() == AlphaTest::UNDETERMINED) && is_writing_shadercode)
+		else if (cur_bpmem->UseEarlyDepthTest() && (g_ActiveConfig.bFastDepthCalc || cur_bpmem->alpha_test.TestResult() == AlphaTest::UNDETERMINED) && is_writing_shadercode)
 		{
 			static bool warn_once = true;
 			if (warn_once)
@@ -375,7 +375,7 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 		{
 			out.Write("[earlydepthstencil]\n");
 		}
-		else if (bpmem.UseEarlyDepthTest() && (g_ActiveConfig.bFastDepthCalc || bpmem.alpha_test.TestResult() == AlphaTest::UNDETERMINED) && is_writing_shadercode)
+		else if (cur_bpmem->UseEarlyDepthTest() && (g_ActiveConfig.bFastDepthCalc || cur_bpmem->alpha_test.TestResult() == AlphaTest::UNDETERMINED) && is_writing_shadercode)
 		{
 			static bool warn_once = true;
 			if (warn_once)
@@ -537,22 +537,22 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 
 	// indirect texture map lookup
 	int nIndirectStagesUsed = 0;
-	if (bpmem.genMode.numindstages > 0)
+	if (cur_bpmem->genMode.numindstages > 0)
 	{
 		for (unsigned int i = 0; i < numStages; ++i)
 		{
-			if (bpmem.tevind[i].IsActive() && bpmem.tevind[i].bt < bpmem.genMode.numindstages)
-				nIndirectStagesUsed |= 1 << bpmem.tevind[i].bt;
+			if (cur_bpmem->tevind[i].IsActive() && cur_bpmem->tevind[i].bt < cur_bpmem->genMode.numindstages)
+				nIndirectStagesUsed |= 1 << cur_bpmem->tevind[i].bt;
 		}
 	}
 
 	uid_data.nIndirectStagesUsed = nIndirectStagesUsed;
-	for (u32 i = 0; i < bpmem.genMode.numindstages; ++i)
+	for (u32 i = 0; i < cur_bpmem->genMode.numindstages; ++i)
 	{
 		if (nIndirectStagesUsed & (1 << i))
 		{
-			unsigned int texcoord = bpmem.tevindref.getTexCoord(i);
-			unsigned int texmap = bpmem.tevindref.getTexMap(i);
+			unsigned int texcoord = cur_bpmem->tevindref.getTexCoord(i);
+			unsigned int texmap = cur_bpmem->tevindref.getTexMap(i);
 
 			uid_data.SetTevindrefValues(i, texcoord, texmap);
 			if (texcoord < numTexgen)
@@ -584,10 +584,10 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 	const char* swapColors = "rgba";
 	for (int i = 0; i < 4; i++)
 	{
-		swapModeTable[i][0] = swapColors[bpmem.tevksel[i*2].swap1];
-		swapModeTable[i][1] = swapColors[bpmem.tevksel[i*2].swap2];
-		swapModeTable[i][2] = swapColors[bpmem.tevksel[i*2+1].swap1];
-		swapModeTable[i][3] = swapColors[bpmem.tevksel[i*2+1].swap2];
+		swapModeTable[i][0] = swapColors[cur_bpmem->tevksel[i*2].swap1];
+		swapModeTable[i][1] = swapColors[cur_bpmem->tevksel[i*2].swap2];
+		swapModeTable[i][2] = swapColors[cur_bpmem->tevksel[i*2+1].swap1];
+		swapModeTable[i][3] = swapColors[cur_bpmem->tevksel[i*2+1].swap2];
 		swapModeTable[i][4] = '\0';
 	}
 
@@ -603,29 +603,29 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 	{
 		// The results of the last texenv stage are put onto the screen,
 		// regardless of the used destination register
-		if(bpmem.combiners[numStages - 1].colorC.dest != 0)
+		if(cur_bpmem->combiners[numStages - 1].colorC.dest != 0)
 		{
-			bool retrieveFromAuxRegister = !RegisterStates[bpmem.combiners[numStages - 1].colorC.dest].ColorNeedOverflowControl && RegisterStates[bpmem.combiners[numStages - 1].colorC.dest].AuxStored;
-			out.Write("\tprev.rgb = %s%s;\n", retrieveFromAuxRegister ? "c" : "" , tevCOutputTable[bpmem.combiners[numStages - 1].colorC.dest]);
-			RegisterStates[0].ColorNeedOverflowControl = RegisterStates[bpmem.combiners[numStages - 1].colorC.dest].ColorNeedOverflowControl;
+			bool retrieveFromAuxRegister = !RegisterStates[cur_bpmem->combiners[numStages - 1].colorC.dest].ColorNeedOverflowControl && RegisterStates[cur_bpmem->combiners[numStages - 1].colorC.dest].AuxStored;
+			out.Write("\tprev.rgb = %s%s;\n", retrieveFromAuxRegister ? "c" : "" , tevCOutputTable[cur_bpmem->combiners[numStages - 1].colorC.dest]);
+			RegisterStates[0].ColorNeedOverflowControl = RegisterStates[cur_bpmem->combiners[numStages - 1].colorC.dest].ColorNeedOverflowControl;
 		}
-		if(bpmem.combiners[numStages - 1].alphaC.dest != 0)
+		if(cur_bpmem->combiners[numStages - 1].alphaC.dest != 0)
 		{
-			bool retrieveFromAuxRegister = !RegisterStates[bpmem.combiners[numStages - 1].alphaC.dest].AlphaNeedOverflowControl && RegisterStates[bpmem.combiners[numStages - 1].alphaC.dest].AuxStored;
-			out.Write("\tprev.a = %s%s;\n", retrieveFromAuxRegister ? "c" : "" , tevAOutputTable[bpmem.combiners[numStages - 1].alphaC.dest]);
-			RegisterStates[0].AlphaNeedOverflowControl = RegisterStates[bpmem.combiners[numStages - 1].alphaC.dest].AlphaNeedOverflowControl;
+			bool retrieveFromAuxRegister = !RegisterStates[cur_bpmem->combiners[numStages - 1].alphaC.dest].AlphaNeedOverflowControl && RegisterStates[cur_bpmem->combiners[numStages - 1].alphaC.dest].AuxStored;
+			out.Write("\tprev.a = %s%s;\n", retrieveFromAuxRegister ? "c" : "" , tevAOutputTable[cur_bpmem->combiners[numStages - 1].alphaC.dest]);
+			RegisterStates[0].AlphaNeedOverflowControl = RegisterStates[cur_bpmem->combiners[numStages - 1].alphaC.dest].AlphaNeedOverflowControl;
 		}
 	}
 	// emulation of unsigned 8 overflow when casting if needed
 	if(RegisterStates[0].AlphaNeedOverflowControl || RegisterStates[0].ColorNeedOverflowControl)
 		out.Write("\tprev = frac(prev * (255.0f/256.0f)) * (256.0f/255.0f);\n");
 
-	AlphaTest::TEST_RESULT Pretest = bpmem.alpha_test.TestResult();
+	AlphaTest::TEST_RESULT Pretest = cur_bpmem->alpha_test.TestResult();
 	uid_data.Pretest = Pretest;
 
 	// NOTE: Fragment may not be discarded if alpha test always fails and early depth test is enabled 
 	// (in this case we need to write a depth value if depth test passes regardless of the alpha testing result)
-	if (Pretest == AlphaTest::UNDETERMINED || (Pretest == AlphaTest::FAIL && bpmem.UseLateDepthTest()))
+	if (Pretest == AlphaTest::UNDETERMINED || (Pretest == AlphaTest::FAIL && cur_bpmem->UseLateDepthTest()))
 		WriteAlphaTest<T>(out, uid_data, ApiType, dstAlphaMode, per_pixel_depth);
 
 
@@ -642,27 +642,27 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 	}
 
 	// depth texture can safely be ignored if the result won't be written to the depth buffer (early_ztest) and isn't used for fog either
-	const bool skip_ztexture = !per_pixel_depth && !bpmem.fog.c_proj_fsel.fsel;
+	const bool skip_ztexture = !per_pixel_depth && !cur_bpmem->fog.c_proj_fsel.fsel;
 
-	uid_data.ztex_op = bpmem.ztex2.op;
+	uid_data.ztex_op = cur_bpmem->ztex2.op;
 	uid_data.per_pixel_depth = per_pixel_depth;
 	uid_data.forced_early_z = forced_early_z;
 	uid_data.fast_depth_calc = g_ActiveConfig.bFastDepthCalc;
-	uid_data.early_ztest = bpmem.UseEarlyDepthTest();
-	uid_data.fog_fsel = bpmem.fog.c_proj_fsel.fsel;
+	uid_data.early_ztest = cur_bpmem->UseEarlyDepthTest();
+	uid_data.fog_fsel = cur_bpmem->fog.c_proj_fsel.fsel;
 
 	// Note: z-textures are not written to depth buffer if early depth test is used
-	if (per_pixel_depth && bpmem.UseEarlyDepthTest())
+	if (per_pixel_depth && cur_bpmem->UseEarlyDepthTest())
 		out.Write("depth = zCoord;\n");
 
 	// Note: depth texture output is only written to depth buffer if late depth test is used
 	// theoretical final depth value is used for fog calculation, though, so we have to emulate ztextures anyway
-	if (bpmem.ztex2.op != ZTEXTURE_DISABLE && !skip_ztexture)
+	if (cur_bpmem->ztex2.op != ZTEXTURE_DISABLE && !skip_ztexture)
 	{
 		// use the texture input of the last texture stage (textemp), hopefully this has been read and is in correct format...
 		out.SetConstantsUsed(C_ZBIAS, C_ZBIAS+1);
 		out.Write("zCoord = dot(" I_ZBIAS"[0].xyzw, textemp.xyzw) + " I_ZBIAS"[1].w %s;\n",
-									(bpmem.ztex2.op == ZTEXTURE_ADD) ? "+ zCoord" : "");
+									(cur_bpmem->ztex2.op == ZTEXTURE_ADD) ? "+ zCoord" : "");
 
 		// U24 overflow emulation
 		out.Write("zCoord = zCoord * (16777215.0f/16777216.0f);\n");
@@ -670,7 +670,7 @@ static inline void GeneratePixelShader(T& out, DSTALPHA_MODE dstAlphaMode, API_T
 		out.Write("zCoord = zCoord * (16777216.0f/16777215.0f);\n");
 	}
 
-	if (per_pixel_depth && bpmem.UseLateDepthTest())
+	if (per_pixel_depth && cur_bpmem->UseLateDepthTest())
 		out.Write("depth = zCoord;\n");
 
 	if (dstAlphaMode == DSTALPHA_ALPHA_PASS)
@@ -764,9 +764,9 @@ static const char *TEVCMPAlphaOPTable[16] =
 template<class T>
 static inline void WriteStage(T& out, pixel_shader_uid_data& uid_data, int n, API_TYPE ApiType, RegisterState RegisterStates[4], const char swapModeTable[4][5])
 {
-	int texcoord = bpmem.tevorders[n/2].getTexCoord(n&1);
-	bool bHasTexCoord = (u32)texcoord < bpmem.genMode.numtexgens;
-	bool bHasIndStage = bpmem.tevind[n].IsActive() && bpmem.tevind[n].bt < bpmem.genMode.numindstages;
+	int texcoord = cur_bpmem->tevorders[n/2].getTexCoord(n&1);
+	bool bHasTexCoord = (u32)texcoord < cur_bpmem->genMode.numtexgens;
+	bool bHasIndStage = cur_bpmem->tevind[n].IsActive() && cur_bpmem->tevind[n].bt < cur_bpmem->genMode.numindstages;
 	// HACK to handle cases where the tex gen is not enabled
 	if (!bHasTexCoord)
 		texcoord = 0;
@@ -777,45 +777,45 @@ static inline void WriteStage(T& out, pixel_shader_uid_data& uid_data, int n, AP
 	uid_data.stagehash[n].tevorders_texcoord = texcoord;
 	if (bHasIndStage)
 	{
-		uid_data.stagehash[n].tevind = bpmem.tevind[n].hex & 0x7FFFFF;
+		uid_data.stagehash[n].tevind = cur_bpmem->tevind[n].hex & 0x7FFFFF;
 
 		out.Write("// indirect op\n");
 		// perform the indirect op on the incoming regular coordinates using indtex%d as the offset coords
-		if (bpmem.tevind[n].bs != ITBA_OFF)
+		if (cur_bpmem->tevind[n].bs != ITBA_OFF)
 		{
 			out.Write("alphabump = indtex%d.%s %s;\n",
-					bpmem.tevind[n].bt,
-					tevIndAlphaSel[bpmem.tevind[n].bs],
-					tevIndAlphaScale[bpmem.tevind[n].fmt]);
+					cur_bpmem->tevind[n].bt,
+					tevIndAlphaSel[cur_bpmem->tevind[n].bs],
+					tevIndAlphaScale[cur_bpmem->tevind[n].fmt]);
 		}
 		// format
-		out.Write("float3 indtevcrd%d = indtex%d * %s;\n", n, bpmem.tevind[n].bt, tevIndFmtScale[bpmem.tevind[n].fmt]);
+		out.Write("float3 indtevcrd%d = indtex%d * %s;\n", n, cur_bpmem->tevind[n].bt, tevIndFmtScale[cur_bpmem->tevind[n].fmt]);
 
 		// bias
-		if (bpmem.tevind[n].bias != ITB_NONE )
-			out.Write("indtevcrd%d.%s += %s;\n", n, tevIndBiasField[bpmem.tevind[n].bias], tevIndBiasAdd[bpmem.tevind[n].fmt]);
+		if (cur_bpmem->tevind[n].bias != ITB_NONE )
+			out.Write("indtevcrd%d.%s += %s;\n", n, tevIndBiasField[cur_bpmem->tevind[n].bias], tevIndBiasAdd[cur_bpmem->tevind[n].fmt]);
 
 		// multiply by offset matrix and scale
-		if (bpmem.tevind[n].mid != 0)
+		if (cur_bpmem->tevind[n].mid != 0)
 		{
-			if (bpmem.tevind[n].mid <= 3)
+			if (cur_bpmem->tevind[n].mid <= 3)
 			{
-				int mtxidx = 2*(bpmem.tevind[n].mid-1);
+				int mtxidx = 2*(cur_bpmem->tevind[n].mid-1);
 				out.SetConstantsUsed(C_INDTEXMTX+mtxidx, C_INDTEXMTX+mtxidx);
 				out.Write("float2 indtevtrans%d = float2(dot(" I_INDTEXMTX"[%d].xyz, indtevcrd%d), dot(" I_INDTEXMTX"[%d].xyz, indtevcrd%d));\n",
 							n, mtxidx, n, mtxidx+1, n);
 			}
-			else if (bpmem.tevind[n].mid <= 7 && bHasTexCoord)
+			else if (cur_bpmem->tevind[n].mid <= 7 && bHasTexCoord)
 			{ // s matrix
-				_assert_(bpmem.tevind[n].mid >= 5);
-				int mtxidx = 2*(bpmem.tevind[n].mid-5);
+				_assert_(cur_bpmem->tevind[n].mid >= 5);
+				int mtxidx = 2*(cur_bpmem->tevind[n].mid-5);
 				out.SetConstantsUsed(C_INDTEXMTX+mtxidx, C_INDTEXMTX+mtxidx);
 				out.Write("float2 indtevtrans%d = " I_INDTEXMTX"[%d].ww * uv%d.xy * indtevcrd%d.xx;\n", n, mtxidx, texcoord, n);
 			}
-			else if (bpmem.tevind[n].mid <= 11 && bHasTexCoord)
+			else if (cur_bpmem->tevind[n].mid <= 11 && bHasTexCoord)
 			{ // t matrix
-				_assert_(bpmem.tevind[n].mid >= 9);
-				int mtxidx = 2*(bpmem.tevind[n].mid-9);
+				_assert_(cur_bpmem->tevind[n].mid >= 9);
+				int mtxidx = 2*(cur_bpmem->tevind[n].mid-9);
 				out.SetConstantsUsed(C_INDTEXMTX+mtxidx, C_INDTEXMTX+mtxidx);
 				out.Write("float2 indtevtrans%d = " I_INDTEXMTX"[%d].ww * uv%d.xy * indtevcrd%d.yy;\n", n, mtxidx, texcoord, n);
 			}
@@ -834,29 +834,29 @@ static inline void WriteStage(T& out, pixel_shader_uid_data& uid_data, int n, AP
 		// ---------
 
 		// wrap S
-		if (bpmem.tevind[n].sw == ITW_OFF)
+		if (cur_bpmem->tevind[n].sw == ITW_OFF)
 			out.Write("wrappedcoord.x = uv%d.x;\n", texcoord);
-		else if (bpmem.tevind[n].sw == ITW_0)
+		else if (cur_bpmem->tevind[n].sw == ITW_0)
 			out.Write("wrappedcoord.x = 0.0f;\n");
 		else
-			out.Write("wrappedcoord.x = fmod( uv%d.x, %s );\n", texcoord, tevIndWrapStart[bpmem.tevind[n].sw]);
+			out.Write("wrappedcoord.x = fmod( uv%d.x, %s );\n", texcoord, tevIndWrapStart[cur_bpmem->tevind[n].sw]);
 
 		// wrap T
-		if (bpmem.tevind[n].tw == ITW_OFF)
+		if (cur_bpmem->tevind[n].tw == ITW_OFF)
 			out.Write("wrappedcoord.y = uv%d.y;\n", texcoord);
-		else if (bpmem.tevind[n].tw == ITW_0)
+		else if (cur_bpmem->tevind[n].tw == ITW_0)
 			out.Write("wrappedcoord.y = 0.0f;\n");
 		else
-			out.Write("wrappedcoord.y = fmod( uv%d.y, %s );\n", texcoord, tevIndWrapStart[bpmem.tevind[n].tw]);
+			out.Write("wrappedcoord.y = fmod( uv%d.y, %s );\n", texcoord, tevIndWrapStart[cur_bpmem->tevind[n].tw]);
 
-		if (bpmem.tevind[n].fb_addprev) // add previous tevcoord
+		if (cur_bpmem->tevind[n].fb_addprev) // add previous tevcoord
 			out.Write("tevcoord.xy += wrappedcoord + indtevtrans%d;\n", n);
 		else
 			out.Write("tevcoord.xy = wrappedcoord + indtevtrans%d;\n", n);
 	}
 
-	TevStageCombiner::ColorCombiner &cc = bpmem.combiners[n].colorC;
-	TevStageCombiner::AlphaCombiner &ac = bpmem.combiners[n].alphaC;
+	TevStageCombiner::ColorCombiner &cc = cur_bpmem->combiners[n].colorC;
+	TevStageCombiner::AlphaCombiner &ac = cur_bpmem->combiners[n].alphaC;
 
 	uid_data.stagehash[n].cc = cc.hex & 0xFFFFFF;
 	uid_data.stagehash[n].ac = ac.hex & 0xFFFFF0; // Storing rswap and tswap later
@@ -868,21 +868,21 @@ static inline void WriteStage(T& out, pixel_shader_uid_data& uid_data, int n, AP
 		|| ac.a == TEVALPHAARG_RASA || ac.b == TEVALPHAARG_RASA
 		|| ac.c == TEVALPHAARG_RASA || ac.d == TEVALPHAARG_RASA)
 	{
-		const int i = bpmem.combiners[n].alphaC.rswap;
-		uid_data.stagehash[n].ac |= bpmem.combiners[n].alphaC.rswap;
-		uid_data.stagehash[n].tevksel_swap1a = bpmem.tevksel[i*2].swap1;
-		uid_data.stagehash[n].tevksel_swap2a = bpmem.tevksel[i*2].swap2;
-		uid_data.stagehash[n].tevksel_swap1b = bpmem.tevksel[i*2+1].swap1;
-		uid_data.stagehash[n].tevksel_swap2b = bpmem.tevksel[i*2+1].swap2;
-		uid_data.stagehash[n].tevorders_colorchan = bpmem.tevorders[n / 2].getColorChan(n & 1);
+		const int i = cur_bpmem->combiners[n].alphaC.rswap;
+		uid_data.stagehash[n].ac |= cur_bpmem->combiners[n].alphaC.rswap;
+		uid_data.stagehash[n].tevksel_swap1a = cur_bpmem->tevksel[i*2].swap1;
+		uid_data.stagehash[n].tevksel_swap2a = cur_bpmem->tevksel[i*2].swap2;
+		uid_data.stagehash[n].tevksel_swap1b = cur_bpmem->tevksel[i*2+1].swap1;
+		uid_data.stagehash[n].tevksel_swap2b = cur_bpmem->tevksel[i*2+1].swap2;
+		uid_data.stagehash[n].tevorders_colorchan = cur_bpmem->tevorders[n / 2].getColorChan(n & 1);
 
-		const char *rasswap = swapModeTable[bpmem.combiners[n].alphaC.rswap];
-		out.Write("rastemp = %s.%s;\n", tevRasTable[bpmem.tevorders[n / 2].getColorChan(n & 1)], rasswap);
+		const char *rasswap = swapModeTable[cur_bpmem->combiners[n].alphaC.rswap];
+		out.Write("rastemp = %s.%s;\n", tevRasTable[cur_bpmem->tevorders[n / 2].getColorChan(n & 1)], rasswap);
 		out.Write("crastemp = frac(rastemp * (255.0f/256.0f)) * (256.0f/255.0f);\n");
 	}
 
-	uid_data.stagehash[n].tevorders_enable = bpmem.tevorders[n / 2].getEnable(n & 1);
-	if (bpmem.tevorders[n/2].getEnable(n&1))
+	uid_data.stagehash[n].tevorders_enable = cur_bpmem->tevorders[n / 2].getEnable(n & 1);
+	if (cur_bpmem->tevorders[n/2].getEnable(n&1))
 	{
 		if (!bHasIndStage)
 		{
@@ -893,17 +893,17 @@ static inline void WriteStage(T& out, pixel_shader_uid_data& uid_data, int n, AP
 				out.Write("tevcoord.xy = float2(0.0f, 0.0f);\n");
 		}
 
-		const int i = bpmem.combiners[n].alphaC.tswap;
-		uid_data.stagehash[n].ac |= bpmem.combiners[n].alphaC.tswap << 2;
-		uid_data.stagehash[n].tevksel_swap1c = bpmem.tevksel[i*2].swap1;
-		uid_data.stagehash[n].tevksel_swap2c = bpmem.tevksel[i*2].swap2;
-		uid_data.stagehash[n].tevksel_swap1d = bpmem.tevksel[i*2+1].swap1;
-		uid_data.stagehash[n].tevksel_swap2d = bpmem.tevksel[i*2+1].swap2;
+		const int i = cur_bpmem->combiners[n].alphaC.tswap;
+		uid_data.stagehash[n].ac |= cur_bpmem->combiners[n].alphaC.tswap << 2;
+		uid_data.stagehash[n].tevksel_swap1c = cur_bpmem->tevksel[i*2].swap1;
+		uid_data.stagehash[n].tevksel_swap2c = cur_bpmem->tevksel[i*2].swap2;
+		uid_data.stagehash[n].tevksel_swap1d = cur_bpmem->tevksel[i*2+1].swap1;
+		uid_data.stagehash[n].tevksel_swap2d = cur_bpmem->tevksel[i*2+1].swap2;
 
-		uid_data.stagehash[n].tevorders_texmap= bpmem.tevorders[n/2].getTexMap(n&1);
+		uid_data.stagehash[n].tevorders_texmap= cur_bpmem->tevorders[n/2].getTexMap(n&1);
 
-		const char *texswap = swapModeTable[bpmem.combiners[n].alphaC.tswap];
-		int texmap = bpmem.tevorders[n/2].getTexMap(n&1);
+		const char *texswap = swapModeTable[cur_bpmem->combiners[n].alphaC.tswap];
+		int texmap = cur_bpmem->tevorders[n/2].getTexMap(n&1);
 		uid_data.SetTevindrefTexmap(i, texmap);
 
 		out.Write("textemp = ");
@@ -918,8 +918,8 @@ static inline void WriteStage(T& out, pixel_shader_uid_data& uid_data, int n, AP
 	if (cc.a == TEVCOLORARG_KONST || cc.b == TEVCOLORARG_KONST || cc.c == TEVCOLORARG_KONST || cc.d == TEVCOLORARG_KONST
 		|| ac.a == TEVALPHAARG_KONST || ac.b == TEVALPHAARG_KONST || ac.c == TEVALPHAARG_KONST || ac.d == TEVALPHAARG_KONST)
 	{
-		int kc = bpmem.tevksel[n / 2].getKC(n & 1);
-		int ka = bpmem.tevksel[n / 2].getKA(n & 1);
+		int kc = cur_bpmem->tevksel[n / 2].getKC(n & 1);
+		int ka = cur_bpmem->tevksel[n / 2].getKA(n & 1);
 		uid_data.stagehash[n].tevksel_kc = kc;
 		uid_data.stagehash[n].tevksel_ka = ka;
 		out.Write("konsttemp = float4(%s, %s);\n", tevKSelTableC[kc], tevKSelTableA[ka]);
@@ -1173,18 +1173,18 @@ static inline void WriteAlphaTest(T& out, pixel_shader_uid_data& uid_data, API_T
 	// using discard then return works the same in cg and dx9 but not in dx11
 	out.Write("\tif(!( ");
 
-	uid_data.alpha_test_comp0 = bpmem.alpha_test.comp0;
-	uid_data.alpha_test_comp1 = bpmem.alpha_test.comp1;
-	uid_data.alpha_test_logic = bpmem.alpha_test.logic;
+	uid_data.alpha_test_comp0 = cur_bpmem->alpha_test.comp0;
+	uid_data.alpha_test_comp1 = cur_bpmem->alpha_test.comp1;
+	uid_data.alpha_test_logic = cur_bpmem->alpha_test.logic;
 
 	// Lookup the first component from the alpha function table
-	int compindex = bpmem.alpha_test.comp0;
+	int compindex = cur_bpmem->alpha_test.comp0;
 	out.Write(tevAlphaFuncsTable[compindex], alphaRef[0]);
 
-	out.Write("%s", tevAlphaFunclogicTable[bpmem.alpha_test.logic]);//lookup the logic op
+	out.Write("%s", tevAlphaFunclogicTable[cur_bpmem->alpha_test.logic]);//lookup the logic op
 
 	// Lookup the second component from the alpha function table
-	compindex = bpmem.alpha_test.comp1;
+	compindex = cur_bpmem->alpha_test.comp1;
 	out.Write(tevAlphaFuncsTable[compindex], alphaRef[1]);
 	out.Write(")) {\n");
 
@@ -1207,7 +1207,7 @@ static inline void WriteAlphaTest(T& out, pixel_shader_uid_data& uid_data, API_T
 	// OpenGL 4.2 has a flag which allows the driver to still update the depth buffer 
 	// if alpha test fails. The driver doesn't have to, but I assume they all do because
 	// it's the much faster code path for the GPU.
-	uid_data.alpha_test_use_zcomploc_hack = bpmem.UseEarlyDepthTest() && bpmem.zmode.updateenable && !g_ActiveConfig.backend_info.bSupportsEarlyZ;
+	uid_data.alpha_test_use_zcomploc_hack = cur_bpmem->UseEarlyDepthTest() && cur_bpmem->zmode.updateenable && !g_ActiveConfig.backend_info.bSupportsEarlyZ;
 	if (!uid_data.alpha_test_use_zcomploc_hack)
 	{
 		out.Write("\t\tdiscard;\n");
@@ -1233,14 +1233,14 @@ static const char *tevFogFuncsTable[] =
 template<class T>
 static inline void WriteFog(T& out, pixel_shader_uid_data& uid_data)
 {
-	uid_data.fog_fsel = bpmem.fog.c_proj_fsel.fsel;
-	if(bpmem.fog.c_proj_fsel.fsel == 0)
+	uid_data.fog_fsel = cur_bpmem->fog.c_proj_fsel.fsel;
+	if(cur_bpmem->fog.c_proj_fsel.fsel == 0)
 		return; // no Fog
 
-	uid_data.fog_proj = bpmem.fog.c_proj_fsel.proj;
+	uid_data.fog_proj = cur_bpmem->fog.c_proj_fsel.proj;
 
 	out.SetConstantsUsed(C_FOG, C_FOG+1);
-	if (bpmem.fog.c_proj_fsel.proj == 0)
+	if (cur_bpmem->fog.c_proj_fsel.proj == 0)
 	{
 		// perspective
 		// ze = A/(B - (Zs >> B_SHF)
@@ -1256,8 +1256,8 @@ static inline void WriteFog(T& out, pixel_shader_uid_data& uid_data)
 	// x_adjust = sqrt((x-center)^2 + k^2)/k
 	// ze *= x_adjust
 	// this is completely theoretical as the real hardware seems to use a table intead of calculating the values.
-	uid_data.fog_RangeBaseEnabled = bpmem.fogRange.Base.Enabled;
-	if (bpmem.fogRange.Base.Enabled)
+	uid_data.fog_RangeBaseEnabled = cur_bpmem->fogRange.Base.Enabled;
+	if (cur_bpmem->fogRange.Base.Enabled)
 	{
 		out.SetConstantsUsed(C_FOG+2, C_FOG+2);
 		out.Write("\tfloat x_adjust = (2.0f * (clipPos.x / " I_FOG"[2].y)) - 1.0f - " I_FOG"[2].x;\n");
@@ -1267,14 +1267,14 @@ static inline void WriteFog(T& out, pixel_shader_uid_data& uid_data)
 
 	out.Write("\tfloat fog = clamp(ze - " I_FOG"[1].z, 0.0f, 1.0f);\n");
 
-	if (bpmem.fog.c_proj_fsel.fsel > 3)
+	if (cur_bpmem->fog.c_proj_fsel.fsel > 3)
 	{
-		out.Write("%s", tevFogFuncsTable[bpmem.fog.c_proj_fsel.fsel]);
+		out.Write("%s", tevFogFuncsTable[cur_bpmem->fog.c_proj_fsel.fsel]);
 	}
 	else
 	{
-		if (bpmem.fog.c_proj_fsel.fsel != 2 && out.GetBuffer() != NULL)
-			WARN_LOG(VIDEO, "Unknown Fog Type! %08x", bpmem.fog.c_proj_fsel.fsel);
+		if (cur_bpmem->fog.c_proj_fsel.fsel != 2 && out.GetBuffer() != NULL)
+			WARN_LOG(VIDEO, "Unknown Fog Type! %08x", cur_bpmem->fog.c_proj_fsel.fsel);
 	}
 
 	out.Write("\tprev.rgb = lerp(prev.rgb, " I_FOG"[0].rgb, fog);\n");

@@ -103,19 +103,19 @@ inline int iround(float x)
 
 void SetScissor()
 {
-	int xoff = bpmem.scissorOffset.x * 2 - 342;
-	int yoff = bpmem.scissorOffset.y * 2 - 342;
+	int xoff = cur_bpmem->scissorOffset.x * 2 - 342;
+	int yoff = cur_bpmem->scissorOffset.y * 2 - 342;
 
-	scissorLeft = bpmem.scissorTL.x - xoff - 342;
+	scissorLeft = cur_bpmem->scissorTL.x - xoff - 342;
 	if (scissorLeft < 0) scissorLeft = 0;
 
-	scissorTop = bpmem.scissorTL.y - yoff - 342;
+	scissorTop = cur_bpmem->scissorTL.y - yoff - 342;
 	if (scissorTop < 0) scissorTop = 0;
 
-	scissorRight = bpmem.scissorBR.x - xoff - 341;
+	scissorRight = cur_bpmem->scissorBR.x - xoff - 341;
 	if (scissorRight > EFB_WIDTH) scissorRight = EFB_WIDTH;
 
-	scissorBottom = bpmem.scissorBR.y - yoff - 341;
+	scissorBottom = cur_bpmem->scissorBR.y - yoff - 341;
 	if (scissorBottom > EFB_HEIGHT) scissorBottom = EFB_HEIGHT;
 }
 
@@ -135,11 +135,11 @@ inline void Draw(s32 x, s32 y, s32 xi, s32 yi)
 	if (z < 0 || z > 0x00ffffff)
 		return;
 
-	if (bpmem.UseEarlyDepthTest() && g_SWVideoConfig.bZComploc)
+	if (cur_bpmem->UseEarlyDepthTest() && g_SWVideoConfig.bZComploc)
 	{
 		// TODO: Test if perf regs are incremented even if test is disabled
 		SWPixelEngine::pereg.IncZInputQuadCount(true);
-		if (bpmem.zmode.testenable)
+		if (cur_bpmem->zmode.testenable)
 		{
 			// early z
 			if (!EfbInterface::ZCompare(x, y, z))
@@ -155,7 +155,7 @@ inline void Draw(s32 x, s32 y, s32 xi, s32 yi)
 	tev.Position[2] = z;
 
 	//  colors
-	for (unsigned int i = 0; i < bpmem.genMode.numcolchans; i++)
+	for (unsigned int i = 0; i < cur_bpmem->genMode.numcolchans; i++)
 	{
 		for(int comp = 0; comp < 4; comp++)
 		{
@@ -169,20 +169,20 @@ inline void Draw(s32 x, s32 y, s32 xi, s32 yi)
 	}
 
 	// tex coords
-	for (unsigned int i = 0; i < bpmem.genMode.numtexgens; i++)
+	for (unsigned int i = 0; i < cur_bpmem->genMode.numtexgens; i++)
 	{
 		// multiply by 128 because TEV stores UVs as s17.7
 		tev.Uv[i].s = (s32)(pixel.Uv[i][0] * 128);
 		tev.Uv[i].t = (s32)(pixel.Uv[i][1] * 128);
 	}
 
-	for (unsigned int i = 0; i < bpmem.genMode.numindstages; i++)
+	for (unsigned int i = 0; i < cur_bpmem->genMode.numindstages; i++)
 	{
 		tev.IndirectLod[i] = rasterBlock.IndirectLod[i];
 		tev.IndirectLinear[i] = rasterBlock.IndirectLinear[i];
 	}
 
-	for (unsigned int i = 0; i <= bpmem.genMode.numtevstages; i++)
+	for (unsigned int i = 0; i <= cur_bpmem->genMode.numtevstages; i++)
 	{
 		tev.TextureLod[i] = rasterBlock.TextureLod[i];
 		tev.TextureLinear[i] = rasterBlock.TextureLinear[i];
@@ -217,7 +217,7 @@ void InitSlope(Slope *slope, float f1, float f2, float f3, float DX31, float DX1
 
 inline void CalculateLOD(s32 &lod, bool &linear, u32 texmap, u32 texcoord)
 {
-	FourTexUnits& texUnit = bpmem.tex[(texmap >> 2) & 1];
+	FourTexUnits& texUnit = cur_bpmem->tex[(texmap >> 2) & 1];
 	u8 subTexmap = texmap & 3;
 
 	// LOD calculation requires data from the texture mode for bias, etc.
@@ -276,7 +276,7 @@ void BuildBlock(s32 blockX, s32 blockY)
 			pixel.InvW = invW;
 
 			// tex coords
-			for (unsigned int i = 0; i < bpmem.genMode.numtexgens; i++)
+			for (unsigned int i = 0; i < cur_bpmem->genMode.numtexgens; i++)
 			{
 				float projection = invW;
 				if (swxfregs.texMtxInfo[i].projection)
@@ -292,8 +292,8 @@ void BuildBlock(s32 blockX, s32 blockY)
 		}
 	}
 
-	u32 indref = bpmem.tevindref.hex;
-	for (unsigned int i = 0; i < bpmem.genMode.numindstages; i++)
+	u32 indref = cur_bpmem->tevindref.hex;
+	for (unsigned int i = 0; i < cur_bpmem->genMode.numindstages; i++)
 	{
 		u32 texmap = indref & 3;
 		indref >>= 3;
@@ -303,10 +303,10 @@ void BuildBlock(s32 blockX, s32 blockY)
 		CalculateLOD(rasterBlock.IndirectLod[i], rasterBlock.IndirectLinear[i], texmap, texcoord);
 	}
 
-	for (unsigned int i = 0; i <= bpmem.genMode.numtevstages; i++)
+	for (unsigned int i = 0; i <= cur_bpmem->genMode.numtevstages; i++)
 	{
 		int stageOdd = i&1;
-		TwoTevStageOrders &order = bpmem.tevorders[i >> 1];
+		TwoTevStageOrders &order = cur_bpmem->tevorders[i >> 1];
 		if(order.getEnable(stageOdd))
 		{
 			u32 texmap = order.getTexMap(stageOdd);
@@ -385,16 +385,16 @@ void DrawTriangleFrontFace(OutputVertexData *v0, OutputVertexData *v1, OutputVer
 	float w[3] = { 1.0f / v0->projectedPosition.w, 1.0f / v1->projectedPosition.w, 1.0f / v2->projectedPosition.w };
 	InitSlope(&WSlope, w[0], w[1], w[2], fltdx31, fltdx12, fltdy12, fltdy31);
 
-	if (!bpmem.genMode.zfreeze || !g_SWVideoConfig.bZFreeze)
+	if (!cur_bpmem->genMode.zfreeze || !g_SWVideoConfig.bZFreeze)
 		InitSlope(&ZSlope, v0->screenPosition[2], v1->screenPosition[2], v2->screenPosition[2], fltdx31, fltdx12, fltdy12, fltdy31);
 
-	for(unsigned int i = 0; i < bpmem.genMode.numcolchans; i++)
+	for(unsigned int i = 0; i < cur_bpmem->genMode.numcolchans; i++)
 	{
 		for(int comp = 0; comp < 4; comp++)
 			InitSlope(&ColorSlopes[i][comp], v0->color[i][comp], v1->color[i][comp], v2->color[i][comp], fltdx31, fltdx12, fltdy12, fltdy31);
 	}
 
-	for(unsigned int i = 0; i < bpmem.genMode.numtexgens; i++)
+	for(unsigned int i = 0; i < cur_bpmem->genMode.numtexgens; i++)
 	{
 		for(int comp = 0; comp < 3; comp++)
 			InitSlope(&TexSlopes[i][comp], v0->texCoords[i][comp] * w[0], v1->texCoords[i][comp] * w[1], v2->texCoords[i][comp] * w[2], fltdx31, fltdx12, fltdy12, fltdy31);

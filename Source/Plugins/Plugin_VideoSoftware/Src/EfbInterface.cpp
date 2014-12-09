@@ -36,7 +36,7 @@ namespace EfbInterface
 
 	void SetPixelAlphaOnly(u32 offset, u8 a)
 	{
-			switch (bpmem.zcontrol.pixel_format)
+			switch (cur_bpmem->zcontrol.pixel_format)
 		{
 		case PIXELFMT_RGB8_Z24:
 		case PIXELFMT_Z24:
@@ -53,13 +53,13 @@ namespace EfbInterface
 			}
 			break;
 		default:
-			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", bpmem.zcontrol.pixel_format);
+			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", cur_bpmem->zcontrol.pixel_format);
 		}
 	}
 
 	void SetPixelColorOnly(u32 offset, u8 *rgb)
 	{
-		switch (bpmem.zcontrol.pixel_format)
+		switch (cur_bpmem->zcontrol.pixel_format)
 		{
 		case PIXELFMT_RGB8_Z24:
 		case PIXELFMT_Z24:
@@ -93,13 +93,13 @@ namespace EfbInterface
 			}
 			break;
 		default:
-			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", bpmem.zcontrol.pixel_format);
+			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", cur_bpmem->zcontrol.pixel_format);
 		}
 	}
 
 	void SetPixelAlphaColor(u32 offset, u8 *color)
 	{
-			switch (bpmem.zcontrol.pixel_format)
+			switch (cur_bpmem->zcontrol.pixel_format)
 		{
 		case PIXELFMT_RGB8_Z24:
 		case PIXELFMT_Z24:
@@ -134,13 +134,13 @@ namespace EfbInterface
 			}
 			break;
 		default:
-			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", bpmem.zcontrol.pixel_format);
+			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", cur_bpmem->zcontrol.pixel_format);
 		}
 	}
 
 		void GetPixelColor(u32 offset, u8 *color)
 	{
-		switch (bpmem.zcontrol.pixel_format)
+		switch (cur_bpmem->zcontrol.pixel_format)
 		{
 		case PIXELFMT_RGB8_Z24:
 		case PIXELFMT_Z24:
@@ -170,13 +170,13 @@ namespace EfbInterface
 			}
 			break;
 		default:
-			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", bpmem.zcontrol.pixel_format);
+			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", cur_bpmem->zcontrol.pixel_format);
 		}
 	}
 
 	void SetPixelDepth(u32 offset, u32 depth)
 	{
-		switch (bpmem.zcontrol.pixel_format)
+		switch (cur_bpmem->zcontrol.pixel_format)
 		{
 		case PIXELFMT_RGB8_Z24:
 		case PIXELFMT_RGBA6_Z24:
@@ -198,7 +198,7 @@ namespace EfbInterface
 			}
 			break;
 		default:
-			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", bpmem.zcontrol.pixel_format);
+			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", cur_bpmem->zcontrol.pixel_format);
 		}
 	}
 
@@ -206,7 +206,7 @@ namespace EfbInterface
 	{
 		u32 depth = 0;
 
-		switch (bpmem.zcontrol.pixel_format)
+		switch (cur_bpmem->zcontrol.pixel_format)
 		{
 		case PIXELFMT_RGB8_Z24:
 		case PIXELFMT_RGBA6_Z24:
@@ -222,7 +222,7 @@ namespace EfbInterface
 			}
 			break;
 		default:
-			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", bpmem.zcontrol.pixel_format);
+			ERROR_LOG(VIDEO, "Unsupported pixel format: %i", cur_bpmem->zcontrol.pixel_format);
 		}
 
 		return depth;
@@ -310,8 +310,8 @@ namespace EfbInterface
 
 	void BlendColor(u8 *srcClr, u8 *dstClr)
 	{
-		u32 srcFactor = GetSourceFactor(srcClr, dstClr, bpmem.blendmode.srcfactor);
-		u32 dstFactor = GetDestinationFactor(srcClr, dstClr, bpmem.blendmode.dstfactor);
+		u32 srcFactor = GetSourceFactor(srcClr, dstClr, cur_bpmem->blendmode.srcfactor);
+		u32 dstFactor = GetDestinationFactor(srcClr, dstClr, cur_bpmem->blendmode.dstfactor);
 
 		for (int i = 0; i < 4; i++)
 		{
@@ -403,33 +403,33 @@ namespace EfbInterface
 
 		GetPixelColor(offset, dstClrPtr);
 
-		if (bpmem.blendmode.blendenable)
+		if (cur_bpmem->blendmode.blendenable)
 		{
-			if (bpmem.blendmode.subtract)
+			if (cur_bpmem->blendmode.subtract)
 				SubtractBlend(color, dstClrPtr);
 			else
 				BlendColor(color, dstClrPtr);
 		}
-		else if (bpmem.blendmode.logicopenable)
+		else if (cur_bpmem->blendmode.logicopenable)
 		{
-			LogicBlend(*((u32*)color), dstClr, bpmem.blendmode.logicmode);
+			LogicBlend(*((u32*)color), dstClr, cur_bpmem->blendmode.logicmode);
 		}
 		else
 		{
 			dstClrPtr = color;
 		}
 
-		if (bpmem.dstalpha.enable)
-			dstClrPtr[ALP_C] = bpmem.dstalpha.alpha;
+		if (cur_bpmem->dstalpha.enable)
+			dstClrPtr[ALP_C] = cur_bpmem->dstalpha.alpha;
 
-		if (bpmem.blendmode.colorupdate)
+		if (cur_bpmem->blendmode.colorupdate)
 		{
-			if (bpmem.blendmode.alphaupdate)
+			if (cur_bpmem->blendmode.alphaupdate)
 				SetPixelAlphaColor(offset, dstClrPtr);
 			else
 				SetPixelColorOnly(offset, dstClrPtr);
 		}
-		else if (bpmem.blendmode.alphaupdate)
+		else if (cur_bpmem->blendmode.alphaupdate)
 		{
 			SetPixelAlphaOnly(offset, dstClrPtr[ALP_C]);
 		}
@@ -444,14 +444,14 @@ namespace EfbInterface
 	void SetColor(u16 x, u16 y, u8 *color)
 	{
 		u32 offset = GetColorOffset(x, y);
-		if (bpmem.blendmode.colorupdate)
+		if (cur_bpmem->blendmode.colorupdate)
 		{
-			if (bpmem.blendmode.alphaupdate)
+			if (cur_bpmem->blendmode.alphaupdate)
 				SetPixelAlphaColor(offset, color);
 			else
 				SetPixelColorOnly(offset, color);
 		}
-		else if (bpmem.blendmode.alphaupdate)
+		else if (cur_bpmem->blendmode.alphaupdate)
 		{
 			SetPixelAlphaOnly(offset, color[ALP_C]);
 		}
@@ -459,7 +459,7 @@ namespace EfbInterface
 
 	void SetDepth(u16 x, u16 y, u32 depth)
 	{
-		if (bpmem.zmode.updateenable)
+		if (cur_bpmem->zmode.updateenable)
 			SetPixelDepth(GetDepthOffset(x, y), depth);
 	}
 
@@ -508,7 +508,7 @@ namespace EfbInterface
 
 		bool pass;
 
-		switch (bpmem.zmode.func)
+		switch (cur_bpmem->zmode.func)
 		{
 			case COMPARE_NEVER:
 				pass = false;
@@ -536,10 +536,10 @@ namespace EfbInterface
 				break;
 			default:
 				pass = false;
-				ERROR_LOG(VIDEO, "Bad Z compare mode %i", bpmem.zmode.func);
+				ERROR_LOG(VIDEO, "Bad Z compare mode %i", cur_bpmem->zmode.func);
 		}
 
-		if (pass && bpmem.zmode.updateenable)
+		if (pass && cur_bpmem->zmode.updateenable)
 		{
 			SetPixelDepth(offset, z);
 		}

@@ -498,7 +498,7 @@ void OpcodeDecoder_Shutdown()
 	}
 }
 
-int g_Eye = 0;
+volatile int g_Eye = 0;
 
 u32 OpcodeDecoder_Run(bool skipped_frame)
 {
@@ -507,9 +507,16 @@ u32 OpcodeDecoder_Run(bool skipped_frame)
 	for (int eye = 0; eye < 2; ++eye)
 	{
 		if (eye == 0)
+		{
 			g_renderer->ResetAPIState();
+			cur_bpmem = &bpmem1;
+		}
+		else
+		{
+			cur_bpmem = &bpmem2;
+		}
 		g_Eye = eye;
-		g_renderer->SetEye(eye);
+		g_renderer->ReSetCurrentEyeRT();
 		g_pVideoData = opcodeStart;
 		totalCycles = 0;
 		u32 cycles = FifoCommandRunnable();
@@ -520,8 +527,12 @@ u32 OpcodeDecoder_Run(bool skipped_frame)
 			cycles = FifoCommandRunnable();
 		}
 
+		VertexManager::Flush();
+
 		if (eye == 0)
+		{
 			g_renderer->RestoreAPIState();
+		}
 	}
 	return totalCycles;
 }

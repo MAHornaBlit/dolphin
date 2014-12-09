@@ -7,7 +7,9 @@
 
 // BP state
 // STATE_TO_SAVE
-BPMemory bpmem;
+BPMemory bpmem1;
+BPMemory bpmem2;
+BPMemory *cur_bpmem;
 
 // The backend must implement this.
 void BPWritten(const BPCmd& bp);
@@ -17,15 +19,15 @@ void LoadBPReg(u32 value0)
 {
 	//handle the mask register
 	int opcode = value0 >> 24;
-	int oldval = ((u32*)&bpmem)[opcode];
-	int newval = (oldval & ~bpmem.bpMask) | (value0 & bpmem.bpMask);
+	int oldval = ((u32*)cur_bpmem)[opcode];
+	int newval = (oldval & ~cur_bpmem->bpMask) | (value0 & cur_bpmem->bpMask);
 	int changes = (oldval ^ newval) & 0xFFFFFF;
 
 	BPCmd bp = {opcode, changes, newval};
 
 	//reset the mask register
 	if (opcode != 0xFE)
-		bpmem.bpMask = 0xFFFFFF;
+		cur_bpmem->bpMask = 0xFFFFFF;
 
 	BPWritten(bp);
 }

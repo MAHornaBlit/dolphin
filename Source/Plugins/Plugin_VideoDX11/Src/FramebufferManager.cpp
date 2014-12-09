@@ -13,40 +13,41 @@
 #include "XFBEncoder.h"
 #include "HW/Memmap.h"
 
+extern volatile int g_Eye;
+
 namespace DX11 {
 
 static XFBEncoder s_xfbEncoder;
 
 FramebufferManager::Efb FramebufferManager::m_efb[2];
-unsigned int FramebufferManager::mEye = 0;
 
-D3DTexture2D* &FramebufferManager::GetEFBColorTexture() { return m_efb[mEye].color_tex; }
-ID3D11Texture2D* &FramebufferManager::GetEFBColorStagingBuffer() { return m_efb[mEye].color_staging_buf; }
+D3DTexture2D* &FramebufferManager::GetEFBColorTexture() { return m_efb[g_Eye].color_tex; }
+ID3D11Texture2D* &FramebufferManager::GetEFBColorStagingBuffer() { return m_efb[g_Eye].color_staging_buf; }
 
-D3DTexture2D* &FramebufferManager::GetEFBDepthTexture() { return m_efb[mEye].depth_tex; }
-D3DTexture2D* &FramebufferManager::GetEFBDepthReadTexture() { return m_efb[mEye].depth_read_texture; }
-ID3D11Texture2D* &FramebufferManager::GetEFBDepthStagingBuffer() { return m_efb[mEye].depth_staging_buf; }
+D3DTexture2D* &FramebufferManager::GetEFBDepthTexture() { return m_efb[g_Eye].depth_tex; }
+D3DTexture2D* &FramebufferManager::GetEFBDepthReadTexture() { return m_efb[g_Eye].depth_read_texture; }
+ID3D11Texture2D* &FramebufferManager::GetEFBDepthStagingBuffer() { return m_efb[g_Eye].depth_staging_buf; }
 
 D3DTexture2D* &FramebufferManager::GetResolvedEFBColorTexture()
 {
 	if (g_ActiveConfig.iMultisampleMode)
 	{
-		D3D::context->ResolveSubresource(m_efb[mEye].resolved_color_tex->GetTex(), 0, m_efb[mEye].color_tex->GetTex(), 0, DXGI_FORMAT_R8G8B8A8_UNORM);
-		return m_efb[mEye].resolved_color_tex;
+		D3D::context->ResolveSubresource(m_efb[g_Eye].resolved_color_tex->GetTex(), 0, m_efb[g_Eye].color_tex->GetTex(), 0, DXGI_FORMAT_R8G8B8A8_UNORM);
+		return m_efb[g_Eye].resolved_color_tex;
 	}
 	else
-		return m_efb[mEye].color_tex;
+		return m_efb[g_Eye].color_tex;
 }
 
 D3DTexture2D* &FramebufferManager::GetResolvedEFBDepthTexture()
 {
 	if (g_ActiveConfig.iMultisampleMode)
 	{
-		D3D::context->ResolveSubresource(m_efb[mEye].resolved_color_tex->GetTex(), 0, m_efb[mEye].color_tex->GetTex(), 0, DXGI_FORMAT_R8G8B8A8_UNORM);
-		return m_efb[mEye].resolved_color_tex;
+		D3D::context->ResolveSubresource(m_efb[g_Eye].resolved_color_tex->GetTex(), 0, m_efb[g_Eye].color_tex->GetTex(), 0, DXGI_FORMAT_R8G8B8A8_UNORM);
+		return m_efb[g_Eye].resolved_color_tex;
 	}
 	else
-		return m_efb[mEye].depth_tex;
+		return m_efb[g_Eye].depth_tex;
 }
 
 FramebufferManager::FramebufferManager()
@@ -147,14 +148,14 @@ FramebufferManager::~FramebufferManager()
 {
 	s_xfbEncoder.Shutdown();
 
-	SAFE_RELEASE(m_efb[mEye].color_tex);
-	SAFE_RELEASE(m_efb[mEye].color_temp_tex);
-	SAFE_RELEASE(m_efb[mEye].color_staging_buf);
-	SAFE_RELEASE(m_efb[mEye].resolved_color_tex);
-	SAFE_RELEASE(m_efb[mEye].depth_tex);
-	SAFE_RELEASE(m_efb[mEye].depth_staging_buf);
-	SAFE_RELEASE(m_efb[mEye].depth_read_texture);
-	SAFE_RELEASE(m_efb[mEye].resolved_depth_tex);
+	SAFE_RELEASE(m_efb[g_Eye].color_tex);
+	SAFE_RELEASE(m_efb[g_Eye].color_temp_tex);
+	SAFE_RELEASE(m_efb[g_Eye].color_staging_buf);
+	SAFE_RELEASE(m_efb[g_Eye].resolved_color_tex);
+	SAFE_RELEASE(m_efb[g_Eye].depth_tex);
+	SAFE_RELEASE(m_efb[g_Eye].depth_staging_buf);
+	SAFE_RELEASE(m_efb[g_Eye].depth_read_texture);
+	SAFE_RELEASE(m_efb[g_Eye].resolved_depth_tex);
 }
 
 void FramebufferManager::CopyToRealXFB(u32 xfbAddr, u32 fbWidth, u32 fbHeight, const EFBRectangle& sourceRc,float Gamma)

@@ -44,7 +44,7 @@ void Init()
 
 void SaveTexture(const char* filename, u32 texmap, s32 mip)
 {
-	FourTexUnits& texUnit = bpmem.tex[(texmap >> 2) & 1];
+	FourTexUnits& texUnit = cur_bpmem->tex[(texmap >> 2) & 1];
 	u8 subTexmap = texmap & 3;
 
 	TexImage0& ti0 = texUnit.texImage0[subTexmap];
@@ -82,7 +82,7 @@ void GetTextureBGRA(u8 *dst, u32 texmap, s32 mip, u32 width, u32 height)
 
 s32 GetMaxTextureLod(u32 texmap)
 {
-	FourTexUnits& texUnit = bpmem.tex[(texmap >> 2) & 1];
+	FourTexUnits& texUnit = cur_bpmem->tex[(texmap >> 2) & 1];
 	u8 subTexmap = texmap & 3;
 
 	u8 maxLod = texUnit.texMode1[subTexmap].max_lod;
@@ -97,9 +97,9 @@ s32 GetMaxTextureLod(u32 texmap)
 
 void DumpActiveTextures()
 {
-	for (unsigned int stageNum = 0; stageNum < bpmem.genMode.numindstages; stageNum++)
+	for (unsigned int stageNum = 0; stageNum < cur_bpmem->genMode.numindstages; stageNum++)
 	{
-		u32 texmap = bpmem.tevindref.getTexMap(stageNum);
+		u32 texmap = cur_bpmem->tevindref.getTexMap(stageNum);
 
 		s32 maxLod = GetMaxTextureLod(texmap);
 		for (s32 mip = 0; mip <= maxLod; ++mip)
@@ -110,11 +110,11 @@ void DumpActiveTextures()
 		}
 	}
 
-	for (unsigned int stageNum = 0; stageNum <= bpmem.genMode.numtevstages; stageNum++)
+	for (unsigned int stageNum = 0; stageNum <= cur_bpmem->genMode.numtevstages; stageNum++)
 	{
 		int stageNum2 = stageNum >> 1;
 		int stageOdd = stageNum&1;
-		TwoTevStageOrders &order = bpmem.tevorders[stageNum2];
+		TwoTevStageOrders &order = cur_bpmem->tevorders[stageNum2];
 
 		int texmap = order.getTexMap(stageOdd);
 

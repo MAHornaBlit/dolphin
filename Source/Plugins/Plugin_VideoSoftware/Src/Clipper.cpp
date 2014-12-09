@@ -356,28 +356,28 @@ namespace Clipper
 			if(fabsf(dx) > fabsf(dy))
 			{
 				if(dx > 0)
-					screenDy = bpmem.lineptwidth.linesize / -12.0f;
+					screenDy = cur_bpmem->lineptwidth.linesize / -12.0f;
 				else
-					screenDy = bpmem.lineptwidth.linesize / 12.0f;
+					screenDy = cur_bpmem->lineptwidth.linesize / 12.0f;
 			}
 			else
 			{
 				if(dy > 0)
-					screenDx = bpmem.lineptwidth.linesize / 12.0f;
+					screenDx = cur_bpmem->lineptwidth.linesize / 12.0f;
 				else
-					screenDx = bpmem.lineptwidth.linesize / -12.0f;
+					screenDx = cur_bpmem->lineptwidth.linesize / -12.0f;
 			}
 
 			OutputVertexData triangle[3];
 
 			CopyVertex(&triangle[0], v0, screenDx, screenDy, 0);
 			CopyVertex(&triangle[1], v1, screenDx, screenDy, 0);
-			CopyVertex(&triangle[2], v1, -screenDx, -screenDy, bpmem.lineptwidth.lineoff);
+			CopyVertex(&triangle[2], v1, -screenDx, -screenDy, cur_bpmem->lineptwidth.lineoff);
 
 			// ccw winding
 			Rasterizer::DrawTriangleFrontFace(&triangle[2], &triangle[1], &triangle[0]);
 
-			CopyVertex(&triangle[1], v0, -screenDx, -screenDy, bpmem.lineptwidth.lineoff);
+			CopyVertex(&triangle[1], v0, -screenDx, -screenDy, cur_bpmem->lineptwidth.lineoff);
 
 			Rasterizer::DrawTriangleFrontFace(&triangle[0], &triangle[1], &triangle[2]);
 		}
@@ -409,13 +409,13 @@ namespace Clipper
 
 		backface = normalZDir <= 0.0f;
 
-		if ((bpmem.genMode.cullmode & 1) && !backface) // cull frontfacing
+		if ((cur_bpmem->genMode.cullmode & 1) && !backface) // cull frontfacing
 		{
 			INCSTAT(swstats.thisFrame.numTrianglesCulled)
 			return false;
 		}
 
-		if ((bpmem.genMode.cullmode & 2) && backface) // cull backfacing
+		if ((cur_bpmem->genMode.cullmode & 2) && backface) // cull backfacing
 		{
 			INCSTAT(swstats.thisFrame.numTrianglesCulled)
 			return false;
