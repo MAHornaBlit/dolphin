@@ -35,7 +35,6 @@
 #include <strsafe.h>
 #include "VertexManager.h"
 
-extern volatile int g_Eye;
 extern VertexManager *g_vertex_manager;
 
 namespace DX11
@@ -180,6 +179,13 @@ void CreateScreenshotTexture(const TargetRectangle& rc)
 	D3D::SetDebugObjectName((ID3D11DeviceChild*)s_screenshot_texture, "staging screenshot texture");
 }
 
+DWORD WINAPI DListProcessThreadWrap(LPVOID lpThreadParameter)
+{
+	((DX11::Renderer*)lpThreadParameter)->DListProcessThread();
+
+	return 0;
+}
+
 Renderer::Renderer()
 {
 	int x, y, w_temp, h_temp;
@@ -248,6 +254,10 @@ Renderer::Renderer()
 	D3D::context->RSSetViewports(1, &vp);
 	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
 	D3D::BeginFrame();
+
+
+	DWORD thid;
+	CreateThread(NULL, 0, DListProcessThreadWrap, this, 0, &thid);
 }
 
 Renderer::~Renderer()
@@ -779,6 +789,76 @@ void formatBufferDump(const u8* in, u8* out, int w, int h, int p)
 	}
 }
 
+std::list<_DisplayListNode> DisplayLists[3];
+std::list<_DisplayListNode> *g_CapturingDList=&DisplayLists[0];
+std::list<_DisplayListNode> *g_PlayingDList=&DisplayLists[2];
+unsigned int currentDrawDL = 2;
+unsigned int currentGenDL = 0;
+
+void Renderer::DListProcessThread()
+{
+	while(1)
+	{
+		g_PlayingDList = &DisplayLists[currentDrawDL];
+
+		//ResetAPIState();
+
+		UpdateDrawRectangle(s_backbuffer_width, s_backbuffer_height);
+
+		int X = GetTargetRectangle().left;
+		int Y = GetTargetRectangle().top;
+		int Width = GetTargetRectangle().right - GetTargetRectangle().left;
+		int Height = GetTargetRectangle().bottom - GetTargetRectangle().top;
+
+		if (X < 0) X = 0;
+		if (Y < 0) Y = 0;
+		if (X > s_backbuffer_width) X = s_backbuffer_width;
+		if (Y > s_backbuffer_height) Y = s_backbuffer_height;
+		if (Width < 0) Width = 0;
+		if (Height < 0) Height = 0;
+		if (Width > (s_backbuffer_width - X)) Width = s_backbuffer_width - X;
+		if (Height > (s_backbuffer_height - Y)) Height = s_backbuffer_height - Y;
+
+		D3D11_VIEWPORT vp = CD3D11_VIEWPORT((float)X, (float)Y, (float)Width, (float)Height);
+		D3D::context->RSSetViewports(1, &vp);
+		D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
+
+		RECT sr;
+		sr.left = X;
+		sr.top = Y;
+		sr.right = X + Width;
+		sr.bottom = Y + Height;
+
+		D3D::context->RSSetScissorRects(1, &sr);
+
+		float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
+		D3D::context->ClearRenderTargetView(D3D::GetBackBuffer()->GetRTV(), ClearColor);
+
+
+		//Here, processing the dlist
+
+		//((DX11::VertexManager*)g_vertex_manager)->ProcessDList();
+
+		//Renderer::DrawDebugText();
+
+		//OSD::DrawMessages();
+		D3D::EndFrame();
+		frameCount++;
+
+		//TextureCache::Cleanup();
+
+		stats.ResetFrame();
+
+		// Flip/present backbuffer to frontbuffer here
+		D3D::Present();
+
+		//Renderer::RestoreAPIState();
+		D3D::BeginFrame();
+		D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
+		VertexShaderManager::SetViewportChanged();
+	}
+}
+
 // This function has the final picture. We adjust the aspect ratio here.
 void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,const EFBRectangle& rc,float Gamma)
 {
@@ -793,12 +873,23 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 
 
 #if 1
+	currentDrawDL++;
+	currentDrawDL %= 3;
 
-	((DX11::VertexManager*)g_vertex_manager)->ProcessDList();
+	currentGenDL++;
+	currentGenDL %= 3;
 
 
-#endif
+	g_PlayingDList = &DisplayLists[currentDrawDL];
 
+	g_CapturingDList = &DisplayLists[currentGenDL];
+	g_CapturingDList->clear();
+
+	Core::Callback_VideoCopiedToXFB(XFBWrited || (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB));
+	XFBWrited = false;
+
+	return;
+#else
 	if (field == FIELD_LOWER) xfbAddr -= fbWidth * 2;
 	u32 xfbCount = 0;
 	const XFBSourceBase* const* xfbSourceList = FramebufferManager::GetXFBSource(xfbAddr, fbWidth, fbHeight, xfbCount);
@@ -1087,6 +1178,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 
 	Core::Callback_VideoCopiedToXFB(XFBWrited || (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB));
 	XFBWrited = false;
+#endif
 }
 
 // ALWAYS call RestoreAPIState for each ResetAPIState call you're doing

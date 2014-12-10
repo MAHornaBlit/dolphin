@@ -193,10 +193,23 @@ void XFBSource::DecodeToTexture(u32 xfbAddr, u32 fbWidth, u32 fbHeight)
 	// YUYV data is decoded in Render::Swap.
 }
 
+extern std::list<_DisplayListNode> *g_CapturingDList;
+
 void XFBSource::CopyEFB(float Gamma)
 {
+	_DisplayListNode nn;
+	nn.Type = _DisplayListNode::COPYEFB;
+	nn.CopyEFB.tw = (float)texWidth;
+	nn.CopyEFB.th = (float)texHeight;
+	nn.CopyEFB.tex = tex;
+	nn.CopyEFB.sourceRc = *sourceRc.AsRECT();
+	nn.CopyEFB.gamma = Gamma;
+
+	g_CapturingDList->push_back(nn);
+
+#if 0	//TODO ElSemi
 	g_renderer->ResetAPIState(); // reset any game specific settings
-	
+
 	// Copy EFB data to XFB and restore render target again
 	const D3D11_VIEWPORT vp = CD3D11_VIEWPORT(0.f, 0.f, (float)texWidth, (float)texHeight);
 
@@ -213,6 +226,7 @@ void XFBSource::CopyEFB(float Gamma)
 		FramebufferManager::GetEFBDepthTexture()->GetDSV());
 	
 	g_renderer->RestoreAPIState();
+#endif
 }
 
 }  // namespace DX11

@@ -109,7 +109,7 @@ extern D3DREFLECT PD3DReflect;
 
 struct _DisplayListNode
 {
-	enum _NodeType { DRAW, BEGINEFB, ENDEFB } Type;
+	enum _NodeType { DRAW, COPYEFB } Type;
 
 	struct _DrawNode
 	{
@@ -141,14 +141,25 @@ struct _DisplayListNode
 		bool vsconstantschanged;
 		float psconstants[74 * 4];
 		bool psconstantschanged;
+		float projection[4 * 4];
 
 		NativeVertexFormat *nativeVertexFmt;
 		ID3D11ShaderResourceView *textures[8];
+
+	};
+
+	struct _CopyEFBNode
+	{
+		float tw, th;
+		D3DTexture2D *tex;
+		RECT sourceRc;
+		float gamma;
 	};
 
 	union
 	{
 		 _DrawNode DrawNode;
+		 _CopyEFBNode CopyEFB;
 	};
 };
 
