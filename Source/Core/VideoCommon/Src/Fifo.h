@@ -34,5 +34,6 @@ void Fifo_SetRendering(bool bEnabled);
 
 // Implemented by the Video Backend
 void VideoFifo_CheckAsyncRequest();
+void VideoFifo_DoLightSwap();
 
 #endif // _FIFO_H

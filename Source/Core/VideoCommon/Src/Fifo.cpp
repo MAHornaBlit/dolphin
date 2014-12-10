@@ -128,7 +128,8 @@ void ResetVideoBuffer()
 	size = 0;
 }
 
-
+LARGE_INTEGER LastSwap;
+LARGE_INTEGER Freq;
 // Description: Main FIFO update loop
 // Purpose: Keep the Core HW updated about the CPU-GPU distance
 void RunGpuLoop()
@@ -138,11 +139,30 @@ void RunGpuLoop()
 	SCPFifoStruct &fifo = CommandProcessor::fifo;
 	u32 cyclesExecuted = 0;
 
+	QueryPerformanceFrequency(&Freq);
+	QueryPerformanceCounter(&LastSwap);
+
+	LARGE_INTEGER max_oculus_time;
+	max_oculus_time.QuadPart = (Freq.QuadPart / 75LL)+5;
+
 	while (GpuRunningState)
 	{
 		g_video_backend->PeekMessages();
 
 		VideoFifo_CheckAsyncRequest();
+
+		LARGE_INTEGER CurTime;
+		QueryPerformanceCounter(&CurTime);
+
+		if ((CurTime.QuadPart - LastSwap.QuadPart) > max_oculus_time.QuadPart)
+		{
+			wchar_t tmp[256];
+			swprintf(tmp,L"Forcing Swap %d vs %d\n", (int)(CurTime.QuadPart - LastSwap.QuadPart), (int)max_oculus_time.QuadPart);
+			OutputDebugString(tmp);
+			//Force a lightweight swap
+			VideoFifo_DoLightSwap();
+			LastSwap = CurTime;
+		}
 
 		CommandProcessor::SetCpStatus();
 

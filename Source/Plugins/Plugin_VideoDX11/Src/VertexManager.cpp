@@ -18,6 +18,11 @@
 #include "TextureCacheBase.h"
 #include "VertexShaderManager.h"
 #include "VideoConfig.h"
+#include "FramebufferManager.h"
+#include "XFBEncoder.h"
+#include "D3DUtil.h"
+
+extern float GC_ALIGNED16(g_fProjectionMatrix[16]);
 
 // internal state for loading vertices
 extern NativeVertexFormat *g_nativeVertexFmt;
@@ -30,7 +35,8 @@ extern bool pscbufchanged;
 namespace DX11
 {
 
-std::list<_DisplayListNode> g_CapturingDList;
+extern std::list<_DisplayListNode> *g_CapturingDList;
+extern std::list<_DisplayListNode> *g_PlayingDList;
 extern ID3D11ShaderResourceView *curTextures[8];
 
 // TODO: Find sensible values for these two
@@ -386,18 +392,32 @@ void VertexManager::vFlush()
 
 	//g_renderer->RestoreState();
 
-	g_CapturingDList.push_back(nn);
+	g_CapturingDList->push_back(nn);
 }
 
 
 void VertexManager::DrawNode(_DisplayListNode::_DrawNode &node)
 {
-	if(node.vsconstantschanged)
+	/*if(node.vsconstantschanged)
 		memcpy(vsconstants, node.vsconstants, sizeof(vsconstants));
 	if(node.psconstantschanged)
 		memcpy(psconstants, node.psconstants, sizeof(psconstants));
 	vscbufchanged = node.vsconstantschanged;
 	pscbufchanged = node.psconstantschanged;
+	*/
+	memcpy(vsconstants, node.vsconstants, sizeof(vsconstants));
+	memcpy(psconstants, node.psconstants, sizeof(psconstants));
+	vscbufchanged = true;
+	pscbufchanged = true;
+
+
+	//patch freelook projection matrix, original projection comes in node.projection, already patched in vsconstants anyways
+	{
+
+		//something like this...
+		//memcpy(vsconstants + C_PROJECTION * 4, node.projection, 16);
+	}
+
 
 	PixelShaderCache::SetShader(node.useDstAlpha ? DSTALPHA_DUAL_SOURCE_BLEND : DSTALPHA_NONE, node.nComponents);
 	VertexShaderCache::SetShader(node.nComponents);
@@ -423,14 +443,34 @@ void VertexManager::DrawNode(_DisplayListNode::_DrawNode &node)
 
 void VertexManager::ProcessDList()
 {
-	for(std::list<_DisplayListNode>::iterator it = g_CapturingDList.begin(); it != g_CapturingDList.end(); ++it)
+	for(std::list<_DisplayListNode>::iterator it = g_PlayingDList->begin(); it != g_PlayingDList->end(); ++it)
 	{
 		if (it->Type == _DisplayListNode::DRAW)
 			DrawNode(it->DrawNode);
+		if (it->Type == _DisplayListNode::COPYEFB)
+		{
+			g_renderer->ResetAPIState(); // reset any game specific settings
 
+			// Copy EFB data to XFB and restore render target again
+			const D3D11_VIEWPORT vp = CD3D11_VIEWPORT(0.f, 0.f, (float)it->CopyEFB.tw, (float)it->CopyEFB.th);
+
+			D3D::context->RSSetViewports(1, &vp);
+			D3D::context->OMSetRenderTargets(1, &it->CopyEFB.tex->GetRTV(), NULL);
+			D3D::SetLinearCopySampler();
+
+			D3D::drawShadedTexQuad(FramebufferManager::GetEFBColorTexture()->GetSRV(), &it->CopyEFB.sourceRc,
+				Renderer::GetTargetWidth(), Renderer::GetTargetHeight(),
+				PixelShaderCache::GetColorCopyProgram(true), VertexShaderCache::GetSimpleVertexShader(),
+				VertexShaderCache::GetSimpleInputLayout(), it->CopyEFB.gamma);
+
+			D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(),
+				FramebufferManager::GetEFBDepthTexture()->GetDSV());
+
+			g_renderer->RestoreAPIState();
+
+		}
 	}
 
-	g_CapturingDList.clear();
 }
 
 }  // namespace

@@ -779,6 +779,11 @@ void formatBufferDump(const u8* in, u8* out, int w, int h, int p)
 	}
 }
 
+std::list<_DisplayListNode> DLists[2];
+std::list<_DisplayListNode> *g_CapturingDList=&DLists[0];
+std::list<_DisplayListNode> *g_PlayingDList=&DLists[1];
+
+
 // This function has the final picture. We adjust the aspect ratio here.
 void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,const EFBRectangle& rc,float Gamma)
 {
@@ -794,10 +799,71 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 
 #if 1
 
+	ResetAPIState();
+
+	UpdateDrawRectangle(s_backbuffer_width, s_backbuffer_height);
+
+	int X = GetTargetRectangle().left;
+	int Y = GetTargetRectangle().top;
+	int Width = GetTargetRectangle().right - GetTargetRectangle().left;
+	int Height = GetTargetRectangle().bottom - GetTargetRectangle().top;
+
+	if (X < 0) X = 0;
+	if (Y < 0) Y = 0;
+	if (X > s_backbuffer_width) X = s_backbuffer_width;
+	if (Y > s_backbuffer_height) Y = s_backbuffer_height;
+	if (Width < 0) Width = 0;
+	if (Height < 0) Height = 0;
+	if (Width >(s_backbuffer_width - X)) Width = s_backbuffer_width - X;
+	if (Height >(s_backbuffer_height - Y)) Height = s_backbuffer_height - Y;
+
+	D3D11_VIEWPORT vp = CD3D11_VIEWPORT((float)X, (float)Y, (float)Width, (float)Height);
+	D3D::context->RSSetViewports(1, &vp);
+	D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
+
+	RECT sr;
+	sr.left = X;
+	sr.top = Y;
+	sr.right = X + Width;
+	sr.bottom = Y + Height;
+
+	D3D::context->RSSetScissorRects(1, &sr);
+
+	float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
+	D3D::context->ClearRenderTargetView(D3D::GetBackBuffer()->GetRTV(), ClearColor);
+
+
+	//Here, processing the dlist
+	if (field != FIELD_LIGHTSWAP)	//Replay the latest display list
+	{
+		std::list<_DisplayListNode> *prv = g_CapturingDList;
+		g_CapturingDList = g_PlayingDList;
+		g_PlayingDList = prv;
+		g_CapturingDList->clear();
+	}
+
 	((DX11::VertexManager*)g_vertex_manager)->ProcessDList();
 
+	Renderer::DrawDebugText();
 
-#endif
+	OSD::DrawMessages();
+	D3D::EndFrame();
+	frameCount++;
+
+	TextureCache::Cleanup();
+
+	stats.ResetFrame();
+
+	// Flip/present backbuffer to frontbuffer here
+	D3D::Present();
+
+	Renderer::RestoreAPIState();
+
+	D3D::BeginFrame();
+	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
+	VertexShaderManager::SetViewportChanged();
+
+#else
 
 	if (field == FIELD_LOWER) xfbAddr -= fbWidth * 2;
 	u32 xfbCount = 0;
@@ -1084,9 +1150,13 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	D3D::BeginFrame();
 	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
 	VertexShaderManager::SetViewportChanged();
+#endif
 
-	Core::Callback_VideoCopiedToXFB(XFBWrited || (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB));
-	XFBWrited = false;
+	if (field != FIELD_LIGHTSWAP)
+	{
+		Core::Callback_VideoCopiedToXFB(XFBWrited || (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB));
+		XFBWrited = false;
+	}
 }
 
 // ALWAYS call RestoreAPIState for each ResetAPIState call you're doing

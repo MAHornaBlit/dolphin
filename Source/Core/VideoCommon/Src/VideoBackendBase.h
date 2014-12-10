@@ -20,7 +20,8 @@ enum FieldType
 {
 	FIELD_PROGRESSIVE = 0,
 	FIELD_UPPER,
-	FIELD_LOWER
+	FIELD_LOWER,
+	FIELD_LIGHTSWAP,
 };
 
 enum EFBAccessType
