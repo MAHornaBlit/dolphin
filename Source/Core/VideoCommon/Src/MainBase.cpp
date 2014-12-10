@@ -72,6 +72,7 @@ void VideoFifo_CheckSwapRequest()
 	{
 		if (Common::AtomicLoadAcquire(s_swapRequested))
 		{
+			//Render the other Eye!!
 			EFBRectangle rc;
 			g_renderer->Swap(s_beginFieldArgs.xfbAddr, s_beginFieldArgs.field, s_beginFieldArgs.fbWidth, s_beginFieldArgs.fbHeight,rc);
 			Common::AtomicStoreRelease(s_swapRequested, false);

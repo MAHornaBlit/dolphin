@@ -3,6 +3,7 @@
 #define _RENDER_H_
 
 #include "RenderBase.h"
+#include "D3DBase.h"
 
 namespace DX11
 {
@@ -27,6 +28,8 @@ public:
 	// TODO: Fix confusing names (see ResetAPIState and RestoreAPIState)
 	void ApplyState(bool bUseDstAlpha);
 	void RestoreState();
+	void CaptureState(bool bUseDstAlpha, _DisplayListNode::_DrawNode &node);
+	void ApplyState(_DisplayListNode::_DrawNode &node);
 
 	void ApplyCullDisable();
 	void RestoreCull();

@@ -8,6 +8,7 @@
 #include <D3Dcompiler.h>
 #include "Common.h"
 #include <vector>
+#include "NativeVertexFormat.h"
 
 namespace DX11 
 {
@@ -102,5 +103,58 @@ extern D3D11CREATEDEVICE PD3D11CreateDevice;
 
 typedef HRESULT (WINAPI *D3DREFLECT)(LPCVOID, SIZE_T, REFIID, void**);
 extern D3DREFLECT PD3DReflect;
+
+
+
+
+struct _DisplayListNode
+{
+	enum _NodeType { DRAW, BEGINEFB, ENDEFB } Type;
+
+	struct _DrawNode
+	{
+		u32 UsedTextures;
+		D3D11_SAMPLER_DESC sampdc[8];
+		D3D11_BLEND_DESC blenddc;
+		D3D11_DEPTH_STENCIL_DESC depthdc;
+		D3D11_RASTERIZER_DESC rastdc;
+		ID3D11Buffer *vertexbuffer;
+		unsigned int vertexoffset;
+		unsigned int stride;
+		ID3D11Buffer *indexbuffer;
+
+		int numTriangles;
+		int triangleIndexLen;
+		int triangleDrawIndex;
+
+		//TODO
+		int numLines;
+		int numPoints;
+
+
+
+		bool useDstAlpha;
+		ID3D11InputLayout *layout;
+		u32 nComponents;
+
+		float vsconstants[239 * 4];
+		bool vsconstantschanged;
+		float psconstants[74 * 4];
+		bool psconstantschanged;
+
+		NativeVertexFormat *nativeVertexFmt;
+		ID3D11ShaderResourceView *textures[8];
+	};
+
+	union
+	{
+		 _DrawNode DrawNode;
+	};
+};
+
+
+
+
+
 
 }  // namespace DX11

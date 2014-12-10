@@ -33,6 +33,10 @@
 #include "FPSCounter.h"
 #include "ConfigManager.h"
 #include <strsafe.h>
+#include "VertexManager.h"
+
+extern volatile int g_Eye;
+extern VertexManager *g_vertex_manager;
 
 namespace DX11
 {
@@ -787,6 +791,14 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 		return;
 	}
 
+
+#if 1
+
+	((DX11::VertexManager*)g_vertex_manager)->ProcessDList();
+
+
+#endif
+
 	if (field == FIELD_LOWER) xfbAddr -= fbWidth * 2;
 	u32 xfbCount = 0;
 	const XFBSourceBase* const* xfbSourceList = FramebufferManager::GetXFBSource(xfbAddr, fbWidth, fbHeight, xfbCount);
@@ -1172,6 +1184,118 @@ void Renderer::ApplyState(bool bUseDstAlpha)
 	D3D::context->PSSetShader(PixelShaderCache::GetActiveShader(), NULL, 0);
 	D3D::context->VSSetShader(VertexShaderCache::GetActiveShader(), NULL, 0);
 }
+
+void Renderer::ApplyState(_DisplayListNode::_DrawNode &node)
+{
+	HRESULT hr;
+
+	if (node.useDstAlpha)
+	{
+		// Colors should blend against SRC1_ALPHA
+		if (node.blenddc.RenderTarget[0].SrcBlend == D3D11_BLEND_SRC_ALPHA)
+			node.blenddc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_ALPHA;
+		else if (node.blenddc.RenderTarget[0].SrcBlend == D3D11_BLEND_INV_SRC_ALPHA)
+			node.blenddc.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC1_ALPHA;
+
+		// Colors should blend against SRC1_ALPHA
+		if (node.blenddc.RenderTarget[0].DestBlend == D3D11_BLEND_SRC_ALPHA)
+			node.blenddc.RenderTarget[0].DestBlend = D3D11_BLEND_SRC1_ALPHA;
+		else if (node.blenddc.RenderTarget[0].DestBlend == D3D11_BLEND_INV_SRC_ALPHA)
+			node.blenddc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC1_ALPHA;
+
+		node.blenddc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+		node.blenddc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+		node.blenddc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	}
+
+	ID3D11BlendState* blstate;
+	hr = D3D::device->CreateBlendState(&node.blenddc, &blstate);
+	if (FAILED(hr)) PanicAlert("Failed to create blend state at %s %d\n", __FILE__, __LINE__);
+	D3D::stateman->PushBlendState(blstate);
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)blstate, "blend state used to emulate the GX pipeline");
+	SAFE_RELEASE(blstate);
+
+	ID3D11DepthStencilState* depth_state;
+	hr = D3D::device->CreateDepthStencilState(&node.depthdc, &depth_state);
+	if (SUCCEEDED(hr)) D3D::SetDebugObjectName((ID3D11DeviceChild*)depth_state, "depth-stencil state used to emulate the GX pipeline");
+	else PanicAlert("Failed to create depth state at %s %d\n", __FILE__, __LINE__);
+	D3D::stateman->PushDepthState(depth_state);
+	SAFE_RELEASE(depth_state);
+
+	node.rastdc.FillMode = (g_ActiveConfig.bWireFrame) ? D3D11_FILL_WIREFRAME : D3D11_FILL_SOLID;
+	ID3D11RasterizerState* raststate;
+	hr = D3D::device->CreateRasterizerState(&node.rastdc, &raststate);
+	if (FAILED(hr)) PanicAlert("Failed to create rasterizer state at %s %d\n", __FILE__, __LINE__);
+	D3D::SetDebugObjectName((ID3D11DeviceChild*)raststate, "rasterizer state used to emulate the GX pipeline");
+	D3D::stateman->PushRasterizerState(raststate);
+	SAFE_RELEASE(raststate);
+
+	ID3D11SamplerState* samplerstate[8];
+	for (unsigned int stage = 0; stage < 8; stage++)
+	{
+		// TODO: unnecessary state changes, we should store a list of shader resources
+		//if (shader_resources[stage])
+		{
+			if (g_ActiveConfig.iMaxAnisotropy > 0) node.sampdc[stage].Filter = D3D11_FILTER_ANISOTROPIC;
+			hr = D3D::device->CreateSamplerState(&node.sampdc[stage], &samplerstate[stage]);
+			if (FAILED(hr)) PanicAlert("Fail %s %d, stage=%d\n", __FILE__, __LINE__, stage);
+			else D3D::SetDebugObjectName((ID3D11DeviceChild*)samplerstate[stage], "sampler state used to emulate the GX pipeline");
+		}
+		// else samplerstate[stage] = NULL;
+	}
+	D3D::context->PSSetSamplers(0, 8, samplerstate);
+	for (unsigned int stage = 0; stage < 8; stage++)
+		SAFE_RELEASE(samplerstate[stage]);
+
+	D3D::stateman->Apply();
+
+	if (node.useDstAlpha)
+	{
+		// restore actual state
+		SetBlendMode(false);
+		SetLogicOpMode();
+	}
+
+	D3D::context->PSSetConstantBuffers(0, 1, &PixelShaderCache::GetConstantBuffer());
+	D3D::context->VSSetConstantBuffers(0, 1, &VertexShaderCache::GetConstantBuffer());
+
+	D3D::context->PSSetShader(PixelShaderCache::GetActiveShader(), NULL, 0);
+	D3D::context->VSSetShader(VertexShaderCache::GetActiveShader(), NULL, 0);
+}
+
+
+void Renderer::CaptureState(bool bUseDstAlpha,_DisplayListNode::_DrawNode &node)
+{
+	HRESULT hr;
+
+	if (bUseDstAlpha)
+	{
+		// Colors should blend against SRC1_ALPHA
+		if (gx_state.blenddc.RenderTarget[0].SrcBlend == D3D11_BLEND_SRC_ALPHA)
+			gx_state.blenddc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_ALPHA;
+		else if (gx_state.blenddc.RenderTarget[0].SrcBlend == D3D11_BLEND_INV_SRC_ALPHA)
+			gx_state.blenddc.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC1_ALPHA;
+
+		// Colors should blend against SRC1_ALPHA
+		if (gx_state.blenddc.RenderTarget[0].DestBlend == D3D11_BLEND_SRC_ALPHA)
+			gx_state.blenddc.RenderTarget[0].DestBlend = D3D11_BLEND_SRC1_ALPHA;
+		else if (gx_state.blenddc.RenderTarget[0].DestBlend == D3D11_BLEND_INV_SRC_ALPHA)
+			gx_state.blenddc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC1_ALPHA;
+
+		gx_state.blenddc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+		gx_state.blenddc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+		gx_state.blenddc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	}
+
+	node.blenddc = gx_state.blenddc;
+	node.depthdc = gx_state.depthdc;
+	node.rastdc = gx_state.rastdc;
+	for (int i = 0; i < 8; ++i)
+	{
+		node.sampdc[i] = gx_state.sampdc[i];
+	}
+}
+
 
 void Renderer::RestoreState()
 {

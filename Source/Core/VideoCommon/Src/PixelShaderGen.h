@@ -31,9 +31,9 @@
 #define C_INDTEXMTX		(C_INDTEXSCALE + 2)		//21
 #define C_FOG			(C_INDTEXMTX + 6)		//27
 
-#define C_PLIGHTS		(C_FOG + 3)
-#define C_PMATERIALS	(C_PLIGHTS + 40)
-#define C_PENVCONST_END (C_PMATERIALS + 4)
+#define C_PLIGHTS		(C_FOG + 3)				//30
+#define C_PMATERIALS	(C_PLIGHTS + 40)		//70
+#define C_PENVCONST_END (C_PMATERIALS + 4)		//74
 
 // Different ways to achieve rendering with destination alpha
 enum DSTALPHA_MODE

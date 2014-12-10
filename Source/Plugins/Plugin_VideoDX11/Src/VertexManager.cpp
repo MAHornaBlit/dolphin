@@ -22,8 +22,16 @@
 // internal state for loading vertices
 extern NativeVertexFormat *g_nativeVertexFmt;
 
+extern float vsconstants[C_VENVCONST_END * 4];
+extern bool vscbufchanged;
+extern float psconstants[C_PENVCONST_END * 4];
+extern bool pscbufchanged;
+
 namespace DX11
 {
+
+std::list<_DisplayListNode> g_CapturingDList;
+extern ID3D11ShaderResourceView *curTextures[8];
 
 // TODO: Find sensible values for these two
 const UINT IBUFFER_SIZE = VertexManager::MAXIBUFFERSIZE * sizeof(u16) * 8;
@@ -137,17 +145,95 @@ static const float LINE_PT_TEX_OFFSETS[8] = {
 	0.f, 0.0625f, 0.125f, 0.25f, 0.5f, 1.f, 1.f, 1.f
 };
 
-void VertexManager::Draw(UINT stride)
+void VertexManager::Draw(_DisplayListNode::_DrawNode &node)
 {
-	D3D::context->IASetVertexBuffers(0, 1, &m_vertex_buffers[m_current_vertex_buffer], &stride, &m_vertex_draw_offset);
-	D3D::context->IASetIndexBuffer(m_index_buffers[m_current_index_buffer], DXGI_FORMAT_R16_UINT, 0);
+	D3D::context->IASetVertexBuffers(0, 1, &node.vertexbuffer, &node.stride, &node.vertexoffset);
+	D3D::context->IASetIndexBuffer(node.indexbuffer, DXGI_FORMAT_R16_UINT, 0);
 	
-	if (IndexGenerator::GetNumTriangles() > 0)
+	if (node.numTriangles > 0)
 	{
 		D3D::context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-		D3D::context->DrawIndexed(IndexGenerator::GetTriangleindexLen(), m_triangle_draw_index, 0);
+		D3D::context->DrawIndexed(node.triangleIndexLen, node.triangleDrawIndex, 0);
+	}
+#if 0	
+	// Disable culling for lines and points
+	if (IndexGenerator::GetNumLines() > 0 || IndexGenerator::GetNumPoints() > 0)
+		((DX11::Renderer*)g_renderer)->ApplyCullDisable();
+	if (IndexGenerator::GetNumLines() > 0)
+	{
+		float lineWidth = float(bpmem.lineptwidth.linesize) / 6.f;
+		float texOffset = LINE_PT_TEX_OFFSETS[bpmem.ineptwidth.lineoff];
+		float vpWidth = 2.0f * xfregs.viewport.wd;
+		float vpHeight = -2.0f * xfregs.viewport.ht;
+
+		bool texOffsetEnable[8];
+
+		for (int i = 0; i < 8; ++i)
+			texOffsetEnable[i] = bpmem.texcoords[i].s.line_offset;
+
+		if (m_lineShader.SetShader(g_nativeVertexFmt->m_components, lineWidth,
+			texOffset, vpWidth, vpHeight, texOffsetEnable))
+		{
+			D3D::context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+			D3D::context->DrawIndexed(IndexGenerator::GetLineindexLen(), m_line_draw_index, 0);
+		INCSTAT(stats.thisFrame.numIndexedDrawCalls);
+
+			D3D::context->GSSetShader(NULL, NULL, 0);
+	}
+	}
+	if (IndexGenerator::GetNumPoints() > 0)
+	{
+		float pointSize = float(bpmem.lineptwidth.pointsize) / 6.f;
+		float texOffset = LINE_PT_TEX_OFFSETS[bpmem.lineptwidth.pointoff];
+		float vpWidth = 2.0f * xfregs.viewport.wd;
+		float vpHeight = -2.0f * xfregs.viewport.ht;
+
+		bool texOffsetEnable[8];
+
+		for (int i = 0; i < 8; ++i)
+			texOffsetEnable[i] = bpmem.texcoords[i].s.point_offset;
+
+		if (m_pointShader.SetShader(g_nativeVertexFmt->m_components, pointSize,
+			texOffset, vpWidth, vpHeight, texOffsetEnable))
+		{
+			D3D::context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+			D3D::context->DrawIndexed(IndexGenerator::GetPointindexLen(), m_point_draw_index, 0);
+			INCSTAT(stats.thisFrame.numIndexedDrawCalls);
+
+			D3D::context->GSSetShader(NULL, NULL, 0);
+		}
+	}
+	if (IndexGenerator::GetNumLines() > 0 || IndexGenerator::GetNumPoints() > 0)
+		((DX11::Renderer*)g_renderer)->RestoreCull();
+#endif
+}
+
+void VertexManager::CaptureDraw(UINT stride, _DisplayListNode::_DrawNode &node)
+{
+	//D3D::context->IASetVertexBuffers(0, 1, &m_vertex_buffers[m_current_vertex_buffer], &stride, &m_vertex_draw_offset);
+	node.vertexbuffer = m_vertex_buffers[m_current_vertex_buffer];
+	node.vertexoffset = m_vertex_draw_offset;
+	node.stride = stride;
+	
+	//D3D::context->IASetIndexBuffer(m_index_buffers[m_current_index_buffer], DXGI_FORMAT_R16_UINT, 0);
+	node.indexbuffer = m_index_buffers[m_current_index_buffer];
+
+	node.numTriangles = IndexGenerator::GetNumTriangles();
+
+	if (IndexGenerator::GetNumTriangles() > 0)
+	{
+		//D3D::context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+		node.triangleIndexLen = IndexGenerator::GetTriangleindexLen();
+		node.triangleDrawIndex = m_triangle_draw_index;
+
+		//D3D::context->DrawIndexed(IndexGenerator::GetTriangleindexLen(), m_triangle_draw_index, 0);
+		
 		INCSTAT(stats.thisFrame.numIndexedDrawCalls);
 	}
+
+	node.numLines = IndexGenerator::GetNumLines();
+	node.numPoints = IndexGenerator::GetNumPoints();
+#if 0	//TODO ElSemi
 	// Disable culling for lines and points
 	if (IndexGenerator::GetNumLines() > 0 || IndexGenerator::GetNumPoints() > 0)
 		((DX11::Renderer*)g_renderer)->ApplyCullDisable();
@@ -197,10 +283,17 @@ void VertexManager::Draw(UINT stride)
 	}
 	if (IndexGenerator::GetNumLines() > 0 || IndexGenerator::GetNumPoints() > 0)
 		((DX11::Renderer*)g_renderer)->RestoreCull();
+#endif
 }
 
 void VertexManager::vFlush()
 {
+	_DisplayListNode nn;
+	nn.Type = _DisplayListNode::DRAW;
+
+
+	_DisplayListNode::_DrawNode &Node = nn.DrawNode;
+
 	u32 usedtextures = 0;
 	for (u32 i = 0; i < (u32)bpmem.genMode.numtevstages + 1; ++i)
 		if (bpmem.tevorders[i / 2].getEnable(i & 1))
@@ -236,14 +329,28 @@ void VertexManager::vFlush()
 		}
 	}
 
+	for (int i = 0; i < 8; ++i)
+	{
+		Node.textures[i] = curTextures[i];
+	}
+
 	// set global constants
+	//Capture the constants!!
 	VertexShaderManager::SetConstants();
 	PixelShaderManager::SetConstants(g_nativeVertexFmt->m_components);
+
+	memcpy(Node.vsconstants, vsconstants, sizeof(vsconstants));
+	Node.vsconstantschanged = vscbufchanged;
+	memcpy(Node.psconstants, psconstants, sizeof(psconstants));
+	Node.psconstantschanged = pscbufchanged;
+
+	vscbufchanged = false;
+	pscbufchanged = false;
 
 	bool useDstAlpha = !g_ActiveConfig.bDstAlphaPass && bpmem.dstalpha.enable && bpmem.blendmode.alphaupdate &&
 		bpmem.zcontrol.pixel_format == PIXELFMT_RGBA6_Z24;
 
-	if (!PixelShaderCache::SetShader(
+	/*if (!PixelShaderCache::SetShader(
 		useDstAlpha ? DSTALPHA_DUAL_SOURCE_BLEND : DSTALPHA_NONE,
 		g_nativeVertexFmt->m_components))
 	{
@@ -255,18 +362,75 @@ void VertexManager::vFlush()
 		GFX_DEBUGGER_PAUSE_LOG_AT(NEXT_ERROR,true,{printf("Fail to set pixel shader\n");});
 		return;
 	}
+	*/
+
+	Node.nComponents = g_nativeVertexFmt->m_components;
+
 	PrepareDrawBuffers();
 	unsigned int stride = g_nativeVertexFmt->GetVertexStride();
-	g_nativeVertexFmt->SetupVertexPointers();
-	g_renderer->ApplyState(useDstAlpha);
+	//g_nativeVertexFmt->SetupVertexPointers();
 
-	g_perf_query->EnableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
-	Draw(stride);
-	g_perf_query->DisableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
+	//here, capture draw state
+	Node.UsedTextures = usedtextures;
+	Node.useDstAlpha = useDstAlpha;
+	Node.nativeVertexFmt = g_nativeVertexFmt;
+
+	//g_renderer->ApplyState(useDstAlpha);
+	((DX11::Renderer*)g_renderer)->CaptureState(useDstAlpha, Node);
+	
+	//g_perf_query->EnableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
+	CaptureDraw(stride, Node);
+	//g_perf_query->DisableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
 
 	GFX_DEBUGGER_PAUSE_AT(NEXT_FLUSH, true);
 
+	//g_renderer->RestoreState();
+
+	g_CapturingDList.push_back(nn);
+}
+
+
+void VertexManager::DrawNode(_DisplayListNode::_DrawNode &node)
+{
+	if(node.vsconstantschanged)
+		memcpy(vsconstants, node.vsconstants, sizeof(vsconstants));
+	if(node.psconstantschanged)
+		memcpy(psconstants, node.psconstants, sizeof(psconstants));
+	vscbufchanged = node.vsconstantschanged;
+	pscbufchanged = node.psconstantschanged;
+
+	PixelShaderCache::SetShader(node.useDstAlpha ? DSTALPHA_DUAL_SOURCE_BLEND : DSTALPHA_NONE, node.nComponents);
+	VertexShaderCache::SetShader(node.nComponents);
+	node.nativeVertexFmt->SetupVertexPointers();
+
+	for (int i = 0; i < 8; ++i)
+	{
+		if (node.UsedTextures & (1 << i))
+		{
+			D3D::context->PSSetShaderResources(i, 1, &node.textures[i]);
+		}
+	}
+
+	((DX11::Renderer*)g_renderer)->ApplyState(node);
+
+	
+
+	Draw(node);
+
 	g_renderer->RestoreState();
+}
+
+
+void VertexManager::ProcessDList()
+{
+	for(std::list<_DisplayListNode>::iterator it = g_CapturingDList.begin(); it != g_CapturingDList.end(); ++it)
+	{
+		if (it->Type == _DisplayListNode::DRAW)
+			DrawNode(it->DrawNode);
+
+	}
+
+	g_CapturingDList.clear();
 }
 
 }  // namespace

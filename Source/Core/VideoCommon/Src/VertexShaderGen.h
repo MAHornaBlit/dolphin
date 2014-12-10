@@ -42,16 +42,16 @@
 #define I_POSTTRANSFORMMATRICES "cpostmtx"
 #define I_DEPTHPARAMS           "cDepth" // farZ, zRange, scaled viewport width, scaled viewport height
 
-#define C_POSNORMALMATRIX        0
-#define C_PROJECTION            (C_POSNORMALMATRIX + 6)
-#define C_MATERIALS             (C_PROJECTION + 4)
-#define C_LIGHTS                (C_MATERIALS + 4)
-#define C_TEXMATRICES           (C_LIGHTS + 40)
-#define C_TRANSFORMMATRICES     (C_TEXMATRICES + 24)
-#define C_NORMALMATRICES        (C_TRANSFORMMATRICES + 64)
-#define C_POSTTRANSFORMMATRICES (C_NORMALMATRICES + 32)
-#define C_DEPTHPARAMS           (C_POSTTRANSFORMMATRICES + 64)
-#define C_VENVCONST_END			(C_DEPTHPARAMS + 1)
+#define C_POSNORMALMATRIX        0							//0
+#define C_PROJECTION            (C_POSNORMALMATRIX + 6)		//6
+#define C_MATERIALS             (C_PROJECTION + 4)			//10
+#define C_LIGHTS                (C_MATERIALS + 4)			//14
+#define C_TEXMATRICES           (C_LIGHTS + 40)				//44
+#define C_TRANSFORMMATRICES     (C_TEXMATRICES + 24)		//68
+#define C_NORMALMATRICES        (C_TRANSFORMMATRICES + 64)	//132
+#define C_POSTTRANSFORMMATRICES (C_NORMALMATRICES + 32)		//164
+#define C_DEPTHPARAMS           (C_POSTTRANSFORMMATRICES + 64)	//228
+#define C_VENVCONST_END			(C_DEPTHPARAMS + 1)			//229
 
 const s_svar VSVar_Loc[] = {  {I_POSNORMALMATRIX, C_POSNORMALMATRIX, 6 },
 						{I_PROJECTION , C_PROJECTION, 4  },

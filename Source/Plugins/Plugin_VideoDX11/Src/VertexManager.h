@@ -8,9 +8,28 @@
 #include "VertexManagerBase.h"
 #include "LineGeometryShader.h"
 #include "PointGeometryShader.h"
+#include "NativeVertexFormat.h"
+#include "D3DBlob.h"
 
 namespace DX11
 {
+
+	class D3DVertexFormat : public NativeVertexFormat
+	{
+		D3D11_INPUT_ELEMENT_DESC m_elems[32];
+		UINT m_num_elems;
+
+		DX11::D3DBlob* m_vs_bytecode;
+		ID3D11InputLayout* m_layout;
+
+	public:
+		D3DVertexFormat() : m_num_elems(0), m_vs_bytecode(NULL), m_layout(NULL) {}
+		~D3DVertexFormat() { SAFE_RELEASE(m_vs_bytecode); SAFE_RELEASE(m_layout); }
+
+		void Initialize(const PortableVertexDeclaration &_vtx_decl);
+		void SetupVertexPointers();
+	};
+
 
 class VertexManager : public ::VertexManager
 {
@@ -21,11 +40,15 @@ public:
 	NativeVertexFormat* CreateNativeVertexFormat();
 	void CreateDeviceObjects();
 	void DestroyDeviceObjects();
+	void ProcessDList();
 
 private:
 	
 	void PrepareDrawBuffers();
-	void Draw(u32 stride);
+	void Draw(_DisplayListNode::_DrawNode &node);
+	void CaptureDraw(u32 stride, _DisplayListNode::_DrawNode &node);
+	void DrawNode(_DisplayListNode::_DrawNode &node);
+
 	// temp
 	void vFlush();
 
