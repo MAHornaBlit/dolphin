@@ -41,6 +41,7 @@ ID3D11DeviceContext* context = NULL;
 IDXGISwapChain* swapchain = NULL;
 D3D_FEATURE_LEVEL featlevel;
 D3DTexture2D* backbuf = NULL;
+ID3D11RenderTargetView* backbuffer = NULL;
 D3DTexture2D* DestRTs[2];
 unsigned int LastDisplayedRT = 0;
 HWND hWnd;
@@ -282,6 +283,101 @@ HRESULT Create(HWND wnd)
 		return hr;
 	}
 
+
+
+
+/*	if (!Window)
+        return(false);
+    if (windowed)
+        WinSize = vp.GetSize();
+    else
+    {
+        RECT rc; GetClientRect(Window, &rc);
+        WinSize = Sizei(rc.right-rc.left,rc.bottom-rc.top);
+    }
+      
+    IDXGIFactory * DXGIFactory;    
+    IDXGIAdapter * Adapter;
+    if (FAILED(CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory))))
+        return(false);
+    if (FAILED(DXGIFactory->EnumAdapters(0, &Adapter)))
+        return(false);
+    if (FAILED(D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
+                            NULL, 0, NULL, 0, D3D11_SDK_VERSION, &Device, NULL, &Context)))
+        return(false);
+
+
+    DXGI_SWAP_CHAIN_DESC scDesc;
+    memset(&scDesc, 0, sizeof(scDesc));
+    scDesc.BufferCount          = 2;
+    scDesc.BufferDesc.Width     = WinSize.w;
+    scDesc.BufferDesc.Height    = WinSize.h;
+    scDesc.BufferDesc.Format    = DXGI_FORMAT_R8G8B8A8_UNORM;
+    scDesc.BufferDesc.RefreshRate.Numerator   = 0;
+    scDesc.BufferDesc.RefreshRate.Denominator = 1;
+    scDesc.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    scDesc.OutputWindow         = Window;
+    scDesc.SampleDesc.Count     = 1;
+    scDesc.SampleDesc.Quality   = 0;
+    scDesc.Windowed             = windowed;
+    scDesc.Flags                = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    scDesc.SwapEffect           = DXGI_SWAP_EFFECT_SEQUENTIAL;
+ 
+    if (FAILED(DXGIFactory->CreateSwapChain(Device, &scDesc, &SwapChain)))               return(false);    
+    if (FAILED(SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&BackBuffer))) return(false) ;
+    if (FAILED(Device->CreateRenderTargetView(BackBuffer, NULL, &BackBufferRT)))         return(false) ;
+ 
+    MainDepthBuffer = new ImageBuffer(true,true, Sizei(WinSize.w, WinSize.h));
+    Context->OMSetRenderTargets(1, &BackBufferRT, MainDepthBuffer->TexDsv);
+    if (!windowed) SwapChain->SetFullscreenState(1, NULL);
+    UniformBufferGen = new DataBuffer(D3D11_BIND_CONSTANT_BUFFER, NULL, 2000);// make sure big enough
+ 
+    D3D11_RASTERIZER_DESC rs;
+    memset(&rs, 0, sizeof(rs));
+    rs.AntialiasedLineEnable = rs.DepthClipEnable = true;
+    rs.CullMode              = D3D11_CULL_BACK;    
+     rs.FillMode             = D3D11_FILL_SOLID;
+    ID3D11RasterizerState *  Rasterizer = NULL;
+    Device->CreateRasterizerState(&rs, &Rasterizer);
+    Context->RSSetState(Rasterizer);
+ 
+    D3D11_DEPTH_STENCIL_DESC dss;
+    memset(&dss, 0, sizeof(dss));
+    dss.DepthEnable    = true;
+    dss.DepthFunc      = D3D11_COMPARISON_LESS; 
+    dss.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    ID3D11DepthStencilState * DepthState;
+    Device->CreateDepthStencilState(&dss, &DepthState);
+    Context->OMSetDepthStencilState(DepthState, 0);*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	IDXGIFactory* factory;
 	IDXGIAdapter* adapter;
 	IDXGIOutput* output;
@@ -322,18 +418,22 @@ HRESULT Create(HWND wnd)
 	swap_chain_desc.SampleDesc.Quality = 0;
 	swap_chain_desc.Windowed = TRUE;
 
+
 	DXGI_MODE_DESC mode_desc;
 	memset(&mode_desc, 0, sizeof(mode_desc));
-	mode_desc.Width = xres;
-	mode_desc.Height = yres;
+	mode_desc.Width = 1920;
+	mode_desc.Height = 1080;
 	mode_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	mode_desc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 	hr = output->FindClosestMatchingMode(&mode_desc, &swap_chain_desc.BufferDesc, NULL);
 	if (FAILED(hr)) MessageBox(wnd, _T("Failed to find a supported video mode"), _T("Dolphin Direct3D 11 backend"), MB_OK | MB_ICONERROR);
 
 	// forcing buffer resolution to xres and yres.. TODO: The new video mode might not actually be supported!
-	swap_chain_desc.BufferDesc.Width = xres;
-	swap_chain_desc.BufferDesc.Height = yres;
+	//swap_chain_desc.BufferDesc.Width = xres;
+	//swap_chain_desc.BufferDesc.Height = yres;
+
+	g_BackBufferWidth = swap_chain_desc.BufferDesc.Width;
+	g_BackBufferHeight = swap_chain_desc.BufferDesc.Height;
 
 #if defined(_DEBUG) || defined(DEBUGFAST)
 	// Creating debug devices can sometimes fail if the user doesn't have the correct
@@ -380,6 +480,7 @@ HRESULT Create(HWND wnd)
 		return E_FAIL;
 	}
 	backbuf = new D3DTexture2D(buf, D3D11_BIND_RENDER_TARGET);
+	backbuffer = backbuf->GetRTV();
 	CHECK(backbuf!=NULL, "Create back buffer texture");
 	SetDebugObjectName((ID3D11DeviceChild*)backbuf->GetTex(), "backbuffer texture");
 	SetDebugObjectName((ID3D11DeviceChild*)backbuf->GetRTV(), "backbuffer render target view");

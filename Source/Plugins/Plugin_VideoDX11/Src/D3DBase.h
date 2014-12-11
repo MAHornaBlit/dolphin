@@ -12,6 +12,9 @@
 #include "VideoCommon.h"
 #include "BPMemory.h"
 
+extern unsigned int g_BackBufferWidth;
+extern unsigned int g_BackBufferHeight;
+
 namespace DX11 
 {
 
@@ -43,6 +46,7 @@ void Close();
 
 extern ID3D11Device* device;
 extern ID3D11DeviceContext* context;
+extern ID3D11RenderTargetView* backbuffer;
 extern IDXGISwapChain* swapchain;
 extern bool bFrameInProgress;
 

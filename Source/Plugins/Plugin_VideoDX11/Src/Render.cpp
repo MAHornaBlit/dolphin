@@ -35,6 +35,15 @@
 #include <strsafe.h>
 #include "VertexManager.h"
 
+#include "../Src/OVR_CAPI.h"
+#include "../Src/Kernel/OVR_Math.h"
+
+#define   OVR_D3D_VERSION 11
+#include "../Src/OVR_CAPI_D3D.h"
+
+extern ovrHmd g_hmd;
+extern ovrEyeRenderDesc g_EyeRenderDesc[2];     // Description of the VR
+
 extern volatile int g_Eye;
 extern VertexManager *g_vertex_manager;
 
@@ -859,7 +868,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 		D3D::context->OMSetRenderTargets(1, &rtv, NULL);
 
 		float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
-		D3D::context->ClearRenderTargetView(rtv, ClearColor);
+		//D3D::context->ClearRenderTargetView(rtv, ClearColor);
 
 		// activate linear filtering for the buffer copies
 		D3D::SetLinearCopySampler();
@@ -916,7 +925,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 					//drawRc.right *= hScale;
 				}
 
-				xfbSource->Draw(sourceRc, drawRc, 0, 0);
+				//xfbSource->Draw(sourceRc, drawRc, 0, 0);
 			}
 		}
 		else
@@ -925,7 +934,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 
 			// TODO: Improve sampling algorithm for the pixel shader so that we can use the multisampled EFB texture as source
 			D3DTexture2D* read_texture = FramebufferManager::GetResolvedEFBColorTexture();
-			D3D::drawShadedTexQuad(read_texture->GetSRV(), targetRc.AsRECT(), Renderer::GetTargetWidth(), Renderer::GetTargetHeight(), PixelShaderCache::GetColorCopyProgram(false), VertexShaderCache::GetSimpleVertexShader(), VertexShaderCache::GetSimpleInputLayout(), Gamma);
+			//D3D::drawShadedTexQuad(read_texture->GetSRV(), targetRc.AsRECT(), Renderer::GetTargetWidth(), Renderer::GetTargetHeight(), PixelShaderCache::GetColorCopyProgram(false), VertexShaderCache::GetSimpleVertexShader(), VertexShaderCache::GetSimpleInputLayout(), Gamma);
 		}
 	}
 
@@ -936,7 +945,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	Renderer::DrawDebugText();
 
 	OSD::DrawMessages();
-	D3D::EndFrame();
+	//D3D::EndFrame();
 	frameCount++;
 
 	TextureCache::Cleanup();
@@ -944,11 +953,11 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	stats.ResetFrame();
 
 	// Flip/present backbuffer to frontbuffer here
-	D3D::Present();
+	//D3D::Present();
 
 	Renderer::RestoreAPIState();
 
-	D3D::BeginFrame();
+	//D3D::BeginFrame();
 	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
 	VertexShaderManager::SetViewportChanged();
 
@@ -1710,7 +1719,45 @@ void Renderer::SetInterlacingMode()
 
 }  // namespace DX11
 
+
+
+
+
+
+
 void DoRenderToOculus()
 {
 	//DX11::D3D::DestRTs[DX11::D3D::LastDisplayedRT] contains the latest displayed render target
+
+	ovrHmd_BeginFrame(g_hmd, 0);
+
+	ovrPosef         EyeRenderPose[2];
+
+	ovrVector3f useHmdToEyeViewOffset[2] = {g_EyeRenderDesc[0].HmdToEyeViewOffset,
+		                                    g_EyeRenderDesc[1].HmdToEyeViewOffset};
+
+	ovrHmd_GetEyePoses(g_hmd, 0, useHmdToEyeViewOffset, EyeRenderPose, NULL);
+	
+	ovrRecti         EyeRenderViewport[2];
+
+    for (int eye=0; eye<2; eye++)
+    {
+        EyeRenderViewport[eye].Pos  = OVR::Vector2i(0, 0);
+        EyeRenderViewport[eye].Size = OVR::Sizei(D3D11_RTV_DIMENSION_TEXTURE2D, D3D11_RTV_DIMENSION_TEXTURE2D);
+	}
+
+	ovrD3D11Texture eyeTexture[2]; // Gather data for eye textures 
+	for (int eye = 0; eye<2; eye++)
+	{
+		eyeTexture[eye].D3D11.Header.API            = ovrRenderAPI_D3D11;
+		eyeTexture[eye].D3D11.Header.TextureSize    = OVR::Sizei(g_BackBufferWidth, g_BackBufferHeight);
+		eyeTexture[eye].D3D11.Header.RenderViewport = EyeRenderViewport[eye];
+		eyeTexture[eye].D3D11.pTexture              = DX11::D3D::DestRTs[DX11::D3D::LastDisplayedRT]->GetTex();
+		eyeTexture[eye].D3D11.pSRView               = DX11::D3D::DestRTs[DX11::D3D::LastDisplayedRT]->GetSRV();
+	}
+
+	ovrHmd_EndFrame(g_hmd, EyeRenderPose, &eyeTexture[0].Texture);
+
+		DX11::D3D::swapchain->Present(true, 0); // Vsync enabled
+
 }
