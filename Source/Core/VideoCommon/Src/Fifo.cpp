@@ -132,6 +132,8 @@ LARGE_INTEGER LastSwap;
 LARGE_INTEGER Freq;
 // Description: Main FIFO update loop
 // Purpose: Keep the Core HW updated about the CPU-GPU distance
+void DoRenderToOculus();
+
 void RunGpuLoop()
 {
 	std::lock_guard<std::mutex> lk(m_csHWVidOccupied);
@@ -161,6 +163,7 @@ void RunGpuLoop()
 			OutputDebugString(tmp);
 			//Force a lightweight swap
 			VideoFifo_DoLightSwap();
+			DoRenderToOculus();
 			LastSwap = CurTime;
 		}
 		

@@ -41,6 +41,8 @@ ID3D11DeviceContext* context = NULL;
 IDXGISwapChain* swapchain = NULL;
 D3D_FEATURE_LEVEL featlevel;
 D3DTexture2D* backbuf = NULL;
+D3DTexture2D* DestRTs[2];
+unsigned int LastDisplayedRT = 0;
 HWND hWnd;
 
 std::vector<DXGI_SAMPLE_DESC> aa_modes; // supported AA modes of the current adapter
@@ -378,12 +380,25 @@ HRESULT Create(HWND wnd)
 		return E_FAIL;
 	}
 	backbuf = new D3DTexture2D(buf, D3D11_BIND_RENDER_TARGET);
-	SAFE_RELEASE(buf);
 	CHECK(backbuf!=NULL, "Create back buffer texture");
 	SetDebugObjectName((ID3D11DeviceChild*)backbuf->GetTex(), "backbuffer texture");
 	SetDebugObjectName((ID3D11DeviceChild*)backbuf->GetRTV(), "backbuffer render target view");
 
 	context->OMSetRenderTargets(1, &backbuf->GetRTV(), NULL);
+
+	for (int i = 0; i < 2; ++i)
+	{
+		ID3D11Texture2D *bb;
+		D3D11_TEXTURE2D_DESC desc;
+
+		buf->GetDesc(&desc);
+		device->CreateTexture2D(&desc, NULL, &bb);
+		DestRTs[i] = new D3DTexture2D(bb, D3D11_BIND_RENDER_TARGET);
+		SAFE_RELEASE(bb);
+	}
+	SAFE_RELEASE(buf);
+
+	LastDisplayedRT = 0;
 
 	// BGRA textures are easier to deal with in TextureCache, but might not be supported by the hardware
 	UINT format_support;
