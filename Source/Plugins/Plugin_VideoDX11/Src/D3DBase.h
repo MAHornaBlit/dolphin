@@ -9,6 +9,8 @@
 #include "Common.h"
 #include <vector>
 #include "NativeVertexFormat.h"
+#include "VideoCommon.h"
+#include "BPMemory.h"
 
 namespace DX11 
 {
@@ -142,21 +144,27 @@ struct _DisplayListNode
 		float psconstants[74 * 4];
 		bool psconstantschanged;
 		float projection[4 * 4];
+		bool isprojectiontransform;
+		Matrix44 viewportcorrection;
 
 		NativeVertexFormat *nativeVertexFmt;
 		ID3D11ShaderResourceView *textures[8];
-
+		
 	};
 
 	struct _CopyEFBNode
 	{
-		float tw, th;
-		D3DTexture2D *tex;
-		RECT sourceRc;
-		float gamma;
+		EFBRectangle rc;
+		UPE_Copy peCopy;
+		u32 copyTexDest;
+		u32 zpixelformat;
+		float yScale;
+		X10Y10 copyTexSrcWH;
+		u32 copyMipMapStrideChannels;
+		BPCmd bp;
 	};
 
-	union
+	struct
 	{
 		_DrawNode DrawNode;
 		_CopyEFBNode CopyEFB;

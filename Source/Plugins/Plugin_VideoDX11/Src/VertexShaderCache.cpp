@@ -16,7 +16,7 @@
 #include "ConfigManager.h"
 
 // See comment near the bottom of this file
-static unsigned int vs_constant_offset_table[C_VENVCONST_END];
+unsigned int vs_constant_offset_table[C_VENVCONST_END];
 float vsconstants[C_VENVCONST_END*4];
 bool vscbufchanged = true;
 

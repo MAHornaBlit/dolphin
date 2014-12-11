@@ -84,7 +84,7 @@ void VideoFifo_CheckSwapRequest()
 void VideoFifo_DoLightSwap()
 {
 	EFBRectangle rc;
-	g_renderer->Swap(s_beginFieldArgs.xfbAddr, FIELD_LIGHTSWAP, s_beginFieldArgs.fbWidth, s_beginFieldArgs.fbHeight, rc);
+	g_renderer->Swap(s_beginFieldArgs.xfbAddr, (FieldType)(FIELD_LIGHTSWAP_PROGRESSIVE + s_beginFieldArgs.field), s_beginFieldArgs.fbWidth, s_beginFieldArgs.fbHeight, rc);
 }
 
 // Run from the graphics thread (from Fifo.cpp)

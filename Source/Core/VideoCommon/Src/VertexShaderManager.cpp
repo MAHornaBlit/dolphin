@@ -30,11 +30,11 @@ static int nNormalMatricesChanged[2]; // min,max
 static int nPostTransformMatricesChanged[2]; // min,max
 static int nLightsChanged[2]; // min,max
 
-static Matrix44 s_viewportCorrection;
-static Matrix33 s_viewRotationMatrix;
-static Matrix33 s_viewInvRotationMatrix;
-static float s_fViewTranslationVector[3];
-static float s_fViewRotation[2];
+Matrix44 s_viewportCorrection;
+Matrix33 s_viewRotationMatrix;
+Matrix33 s_viewInvRotationMatrix;
+float s_fViewTranslationVector[3];
+float s_fViewRotation[2];
 
 void UpdateViewport(Matrix44& vpCorrection);
 
@@ -463,7 +463,7 @@ void VertexShaderManager::SetConstants()
 
 		PRIM_LOG("Projection: %f %f %f %f %f %f\n", rawProjection[0], rawProjection[1], rawProjection[2], rawProjection[3], rawProjection[4], rawProjection[5]);
 
-		if ((g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo ) && xfregs.projection.type == GX_PERSPECTIVE)
+		/*if ((g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo ) && xfregs.projection.type == GX_PERSPECTIVE)
 		{
 			Matrix44 mtxA;
 			Matrix44 mtxB;
@@ -478,7 +478,7 @@ void VertexShaderManager::SetConstants()
 
 			SetMultiVSConstant4fv(C_PROJECTION, 4, mtxB.data);
 		}
-		else
+		else*/
 		{
 			Matrix44 projMtx;
 			Matrix44::Set(projMtx, g_fProjectionMatrix);

@@ -31,6 +31,13 @@ extern float vsconstants[C_VENVCONST_END * 4];
 extern bool vscbufchanged;
 extern float psconstants[C_PENVCONST_END * 4];
 extern bool pscbufchanged;
+extern unsigned int vs_constant_offset_table[C_VENVCONST_END];
+
+void DoCopyEFB(EFBRectangle rc, UPE_Copy PE_copy, u32 copyTexDest, u32 zpixelformat, float yScale, X10Y10 copyTexSrcWH, u32 copyMipMapStrideChannels, BPCmd bp);
+extern Matrix33 s_viewRotationMatrix;
+extern float s_fViewTranslationVector[3];
+extern Matrix44 s_viewportCorrection;
+
 
 namespace DX11
 {
@@ -349,6 +356,9 @@ void VertexManager::vFlush()
 	Node.vsconstantschanged = vscbufchanged;
 	memcpy(Node.psconstants, psconstants, sizeof(psconstants));
 	Node.psconstantschanged = pscbufchanged;
+	memcpy(Node.projection, g_fProjectionMatrix, 4 * 4 * sizeof(float));
+	Node.isprojectiontransform = xfregs.projection.type == GX_PERSPECTIVE;
+	Node.viewportcorrection = s_viewportCorrection;
 
 	vscbufchanged = false;
 	pscbufchanged = false;
@@ -395,7 +405,6 @@ void VertexManager::vFlush()
 	g_CapturingDList->push_back(nn);
 }
 
-
 void VertexManager::DrawNode(_DisplayListNode::_DrawNode &node)
 {
 	/*if(node.vsconstantschanged)
@@ -413,9 +422,23 @@ void VertexManager::DrawNode(_DisplayListNode::_DrawNode &node)
 
 	//patch freelook projection matrix, original projection comes in node.projection, already patched in vsconstants anyways
 	{
+		if (node.isprojectiontransform)
+		{
+			Matrix44 mtxA;
+			Matrix44 mtxB;
+			Matrix44 viewMtx;
 
-		//something like this...
-		//memcpy(vsconstants + C_PROJECTION * 4, node.projection, 16);
+			Matrix44::Translate(mtxA, s_fViewTranslationVector);
+			Matrix44::LoadMatrix33(mtxB, s_viewRotationMatrix);
+			Matrix44::Multiply(mtxB, mtxA, viewMtx); // view = rotation x translation
+			Matrix44::Set(mtxB, node.projection);
+			Matrix44::Multiply(mtxB, viewMtx, mtxA); // mtxA = projection x view
+			Matrix44::Multiply(node.viewportcorrection, mtxA, mtxB); // mtxB = viewportCorrection x mtxA
+
+			//something like this...
+			//memcpy(vsconstants + C_PROJECTION * 4, mtxB.data, 16);
+			memcpy(&vsconstants[vs_constant_offset_table[C_PROJECTION]], mtxB.data, 4*4*sizeof(float));
+		}
 	}
 
 
@@ -449,28 +472,27 @@ void VertexManager::ProcessDList()
 			DrawNode(it->DrawNode);
 		if (it->Type == _DisplayListNode::COPYEFB)
 		{
-			g_renderer->ResetAPIState(); // reset any game specific settings
-
-			// Copy EFB data to XFB and restore render target again
-			const D3D11_VIEWPORT vp = CD3D11_VIEWPORT(0.f, 0.f, (float)it->CopyEFB.tw, (float)it->CopyEFB.th);
-
-			D3D::context->RSSetViewports(1, &vp);
-			D3D::context->OMSetRenderTargets(1, &it->CopyEFB.tex->GetRTV(), NULL);
-			D3D::SetLinearCopySampler();
-
-			D3D::drawShadedTexQuad(FramebufferManager::GetEFBColorTexture()->GetSRV(), &it->CopyEFB.sourceRc,
-				Renderer::GetTargetWidth(), Renderer::GetTargetHeight(),
-				PixelShaderCache::GetColorCopyProgram(true), VertexShaderCache::GetSimpleVertexShader(),
-				VertexShaderCache::GetSimpleInputLayout(), it->CopyEFB.gamma);
-
-			D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(),
-				FramebufferManager::GetEFBDepthTexture()->GetDSV());
-
-			g_renderer->RestoreAPIState();
-
+			DoCopyEFB(it->CopyEFB.rc, it->CopyEFB.peCopy, it->CopyEFB.copyTexDest, it->CopyEFB.zpixelformat, it->CopyEFB.yScale, it->CopyEFB.copyTexSrcWH, it->CopyEFB.copyMipMapStrideChannels, it->CopyEFB.bp);
 		}
 	}
 
 }
 
 }  // namespace
+
+void AddCopyEFB(EFBRectangle rc, UPE_Copy PE_copy, u32 copyTexDest, u32 zpixelformat, float yScale, X10Y10 copyTexSrcWH, u32 copyMipMapStrideChannels, BPCmd bp)
+{
+	DX11::_DisplayListNode nn;
+	nn.Type = DX11::_DisplayListNode::COPYEFB;
+	nn.CopyEFB.rc = rc;
+	nn.CopyEFB.peCopy = PE_copy;
+	nn.CopyEFB.copyTexDest = copyTexDest;
+	nn.CopyEFB.zpixelformat = zpixelformat;
+	nn.CopyEFB.yScale = yScale;
+	nn.CopyEFB.copyTexSrcWH = copyTexSrcWH;
+	nn.CopyEFB.copyMipMapStrideChannels = copyMipMapStrideChannels;
+	nn.CopyEFB.bp = bp;
+
+	DX11::g_CapturingDList->push_back(nn);
+
+}

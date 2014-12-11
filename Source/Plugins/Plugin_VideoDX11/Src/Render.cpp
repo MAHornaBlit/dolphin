@@ -799,42 +799,11 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 
 #if 1
 
-	ResetAPIState();
-
-	UpdateDrawRectangle(s_backbuffer_width, s_backbuffer_height);
-
-	int X = GetTargetRectangle().left;
-	int Y = GetTargetRectangle().top;
-	int Width = GetTargetRectangle().right - GetTargetRectangle().left;
-	int Height = GetTargetRectangle().bottom - GetTargetRectangle().top;
-
-	if (X < 0) X = 0;
-	if (Y < 0) Y = 0;
-	if (X > s_backbuffer_width) X = s_backbuffer_width;
-	if (Y > s_backbuffer_height) Y = s_backbuffer_height;
-	if (Width < 0) Width = 0;
-	if (Height < 0) Height = 0;
-	if (Width >(s_backbuffer_width - X)) Width = s_backbuffer_width - X;
-	if (Height >(s_backbuffer_height - Y)) Height = s_backbuffer_height - Y;
-
-	D3D11_VIEWPORT vp = CD3D11_VIEWPORT((float)X, (float)Y, (float)Width, (float)Height);
-	D3D::context->RSSetViewports(1, &vp);
-	D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
-
-	RECT sr;
-	sr.left = X;
-	sr.top = Y;
-	sr.right = X + Width;
-	sr.bottom = Y + Height;
-
-	D3D::context->RSSetScissorRects(1, &sr);
-
-	float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
-	D3D::context->ClearRenderTargetView(D3D::GetBackBuffer()->GetRTV(), ClearColor);
-
+	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
+	VertexShaderManager::SetViewportChanged();
 
 	//Here, processing the dlist
-	if (field != FIELD_LIGHTSWAP)	//Replay the latest display list
+	if (field >= FIELD_PROGRESSIVE && field<=FIELD_LOWER)	
 	{
 		std::list<_DisplayListNode> *prv = g_CapturingDList;
 		g_CapturingDList = g_PlayingDList;
@@ -843,6 +812,108 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	}
 
 	((DX11::VertexManager*)g_vertex_manager)->ProcessDList();
+
+	if (field == FIELD_LOWER || field == FIELD_LIGHTSWAP_LOWER) xfbAddr -= fbWidth * 2;
+	u32 xfbCount = 0;
+	const XFBSourceBase* const* xfbSourceList = FramebufferManager::GetXFBSource(xfbAddr, fbWidth, fbHeight, xfbCount);
+
+
+	ResetAPIState();
+
+	// Prepare to copy the XFBs to our backbuffer
+	UpdateDrawRectangle(s_backbuffer_width, s_backbuffer_height);
+
+	int X = GetTargetRectangle().left;
+	int Y = GetTargetRectangle().top;
+	int Width = GetTargetRectangle().right - GetTargetRectangle().left;
+	int Height = GetTargetRectangle().bottom - GetTargetRectangle().top;
+
+	// TODO: Redundant checks...
+	if (X < 0) X = 0;
+	if (Y < 0) Y = 0;
+	if (X > s_backbuffer_width) X = s_backbuffer_width;
+	if (Y > s_backbuffer_height) Y = s_backbuffer_height;
+	if (Width < 0) Width = 0;
+	if (Height < 0) Height = 0;
+	if (Width >(s_backbuffer_width - X)) Width = s_backbuffer_width - X;
+	if (Height >(s_backbuffer_height - Y)) Height = s_backbuffer_height - Y;
+	D3D11_VIEWPORT vp = CD3D11_VIEWPORT((float)X, (float)Y, (float)Width, (float)Height);
+	D3D::context->RSSetViewports(1, &vp);
+	D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
+
+	float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
+	D3D::context->ClearRenderTargetView(D3D::GetBackBuffer()->GetRTV(), ClearColor);
+
+	// activate linear filtering for the buffer copies
+	D3D::SetLinearCopySampler();
+
+	if (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB)
+	{
+		// TODO: Television should be used to render Virtual XFB mode as well.
+		s_television.Submit(xfbAddr, fbWidth, fbHeight);
+		s_television.Render();
+	}
+	else if (g_ActiveConfig.bUseXFB)
+	{
+		const XFBSourceBase* xfbSource;
+
+		// draw each xfb source
+		for (u32 i = 0; i < xfbCount; ++i)
+		{
+			xfbSource = xfbSourceList[i];
+			MathUtil::Rectangle<float> sourceRc;
+
+			sourceRc.left = 0;
+			sourceRc.top = 0;
+			sourceRc.right = (float)xfbSource->texWidth;
+			sourceRc.bottom = (float)xfbSource->texHeight;
+
+			MathUtil::Rectangle<float> drawRc;
+
+			if (g_ActiveConfig.bUseRealXFB)
+			{
+				drawRc.top = 1;
+				drawRc.bottom = -1;
+				drawRc.left = -1;
+				drawRc.right = 1;
+			}
+			else
+			{
+				// use virtual xfb with offset
+				int xfbHeight = xfbSource->srcHeight;
+				int xfbWidth = xfbSource->srcWidth;
+				int hOffset = ((s32)xfbSource->srcAddr - (s32)xfbAddr) / ((s32)fbWidth * 2);
+
+				drawRc.top = 1.0f - (2.0f * (hOffset) / (float)fbHeight);
+				drawRc.bottom = 1.0f - (2.0f * (hOffset + xfbHeight) / (float)fbHeight);
+				drawRc.left = -(xfbWidth / (float)fbWidth);
+				drawRc.right = (xfbWidth / (float)fbWidth);
+
+				// The following code disables auto stretch.  Kept for reference.
+				// scale draw area for a 1 to 1 pixel mapping with the draw target
+				//float vScale = (float)fbHeight / (float)s_backbuffer_height;
+				//float hScale = (float)fbWidth / (float)s_backbuffer_width;
+				//drawRc.top *= vScale;
+				//drawRc.bottom *= vScale;
+				//drawRc.left *= hScale;
+				//drawRc.right *= hScale;
+			}
+
+			xfbSource->Draw(sourceRc, drawRc, 0, 0);
+		}
+	}
+	else
+	{
+		TargetRectangle targetRc = Renderer::ConvertEFBRectangle(rc);
+
+		// TODO: Improve sampling algorithm for the pixel shader so that we can use the multisampled EFB texture as source
+		D3DTexture2D* read_texture = FramebufferManager::GetResolvedEFBColorTexture();
+		D3D::drawShadedTexQuad(read_texture->GetSRV(), targetRc.AsRECT(), Renderer::GetTargetWidth(), Renderer::GetTargetHeight(), PixelShaderCache::GetColorCopyProgram(false), VertexShaderCache::GetSimpleVertexShader(), VertexShaderCache::GetSimpleInputLayout(), Gamma);
+	}
+
+
+
+
 
 	Renderer::DrawDebugText();
 
@@ -1152,7 +1223,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	VertexShaderManager::SetViewportChanged();
 #endif
 
-	if (field != FIELD_LIGHTSWAP)
+	if (field >= FIELD_PROGRESSIVE && field <= FIELD_LOWER)
 	{
 		Core::Callback_VideoCopiedToXFB(XFBWrited || (g_ActiveConfig.bUseXFB && g_ActiveConfig.bUseRealXFB));
 		XFBWrited = false;

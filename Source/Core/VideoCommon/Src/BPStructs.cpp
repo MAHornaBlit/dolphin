@@ -27,6 +27,9 @@ static bool mapTexFound;
 static int numWrites;
 
 extern volatile bool g_bSkipCurrentFrame;
+void AddCopyEFB(EFBRectangle rc, UPE_Copy PE_copy, u32 copyTexDest, u32 zpixelformat, float yScale, X10Y10 copyTexSrcWH, u32 copyMipMapStrideChannels, BPCmd bp);
+void VideoFifo_CheckEFBAccess();
+void VideoFifo_CheckSwapRequestAt(u32 xfbAddr, u32 fbWidth, u32 fbHeight);
 
 static const float s_gammaLUT[] = 
 {
@@ -254,8 +257,40 @@ void BPWritten(const BPCmd& bp)
 	// It can also optionally clear the EFB while copying from it. To emulate this, we of course copy first and clear afterwards.
 	case BPMEM_TRIGGER_EFB_COPY: // Copy EFB Region or Render to the XFB or Clear the screen.
 		{
+#if 0
 			// The bottom right is within the rectangle
 			// The values in bpmem.copyTexSrcXY and bpmem.copyTexSrcWH are updated in case 0x49 and 0x4a in this function
+			EFBRectangle rc;
+			rc.left = (int)bpmem.copyTexSrcXY.x;
+			rc.top = (int)bpmem.copyTexSrcXY.y;
+
+			// Here Width+1 like Height, otherwise some textures are corrupted already since the native resolution.
+			rc.right = (int)(bpmem.copyTexSrcXY.x + bpmem.copyTexSrcWH.x + 1);
+			rc.bottom = (int)(bpmem.copyTexSrcXY.y + bpmem.copyTexSrcWH.y + 1);
+
+			UPE_Copy PE_copy = bpmem.triggerEFBCopy;
+
+			float yScale;
+			if (PE_copy.scale_invert)
+				yScale = 256.0f / (float)bpmem.dispcopyyscale;
+			else
+				yScale = (float)bpmem.dispcopyyscale / 256.0f;
+
+			AddCopyEFB(rc, PE_copy, bpmem.copyTexDest, bpmem.zcontrol.pixel_format, yScale, bpmem.copyTexSrcWH, bpmem.copyMipMapStrideChannels, bp);
+
+			if (PE_copy.copy_to_xfb != 0)
+			{
+				float xfbLines = ((bpmem.copyTexSrcWH.y + 1.0f) * yScale);
+
+				VideoFifo_CheckEFBAccess();
+				VideoFifo_CheckSwapRequestAt( bpmem.copyTexDest << 5, 
+											  bpmem.copyMipMapStrideChannels << 4,
+											  (u32)xfbLines);
+				Renderer::XFBWrited = true;
+			}
+
+#else
+
 
 			EFBRectangle rc;
 			rc.left = (int)bpmem.copyTexSrcXY.x;
@@ -310,7 +345,7 @@ void BPWritten(const BPCmd& bp)
 			{
 				ClearScreen(rc);
 			}
-
+#endif
 			break;
 		}
 	case BPMEM_LOADTLUT0: // This one updates bpmem.tlutXferSrc, no need to do anything here.
@@ -729,5 +764,47 @@ void BPReload()
 	{
 		BPCmd bp = {BPMEM_FIELDMODE, 0xFFFFFF, static_cast<int>(((u32*)&bpmem)[BPMEM_FIELDMODE])};
 		SetInterlacingMode(bp);
+	}
+}
+
+
+void DoCopyEFB(EFBRectangle rc, UPE_Copy PE_copy, u32 copyTexDest, u32 zpixelformat, float yScale, X10Y10 copyTexSrcWH, u32 copyMipMapStrideChannels,BPCmd bp)
+{
+	// Check if we are to copy from the EFB or draw to the XFB
+	if (PE_copy.copy_to_xfb == 0)
+	{
+		if (GetConfig(CONFIG_SHOWEFBREGIONS))
+			stats.efb_regions.push_back(rc);
+
+		CopyEFB(copyTexDest << 5, PE_copy.tp_realFormat(),
+			zpixelformat, rc, PE_copy.intensity_fmt,
+			PE_copy.half_scale);
+	}
+	else
+	{
+		// We should be able to get away with deactivating the current bbox tracking
+		// here. Not sure if there's a better spot to put this.
+		// the number of lines copied is determined by the y scale * source efb height
+
+		PixelEngine::bbox_active = false;
+
+		float xfbLines = ((copyTexSrcWH.y + 1.0f) * yScale);
+		if ((u32)xfbLines > MAX_XFB_HEIGHT)
+		{
+			INFO_LOG(VIDEO, "Tried to scale EFB to too many XFB lines (%f)", xfbLines);
+			xfbLines = MAX_XFB_HEIGHT;
+		}
+
+		RenderToXFB(bp, rc, yScale, xfbLines,
+			copyTexDest << 5,
+			copyMipMapStrideChannels << 4,
+			(u32)xfbLines,
+			s_gammaLUT[PE_copy.gamma]);
+	}
+
+	// Clear the rectangular region after copying it.
+	if (PE_copy.clear)
+	{
+		ClearScreen(rc);
 	}
 }

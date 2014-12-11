@@ -143,7 +143,7 @@ void RunGpuLoop()
 	QueryPerformanceCounter(&LastSwap);
 
 	LARGE_INTEGER max_oculus_time;
-	max_oculus_time.QuadPart = (Freq.QuadPart / 75LL)+5;
+	max_oculus_time.QuadPart = (Freq.QuadPart / 75LL);
 
 	while (GpuRunningState)
 	{
@@ -153,17 +153,17 @@ void RunGpuLoop()
 
 		LARGE_INTEGER CurTime;
 		QueryPerformanceCounter(&CurTime);
-
+		
 		if ((CurTime.QuadPart - LastSwap.QuadPart) > max_oculus_time.QuadPart)
 		{
 			wchar_t tmp[256];
-			swprintf(tmp,L"Forcing Swap %d vs %d\n", (int)(CurTime.QuadPart - LastSwap.QuadPart), (int)max_oculus_time.QuadPart);
+			//swprintf(tmp,L"Forcing Swap %d vs %d\n", (int)(CurTime.QuadPart - LastSwap.QuadPart), (int)max_oculus_time.QuadPart);
 			OutputDebugString(tmp);
 			//Force a lightweight swap
 			VideoFifo_DoLightSwap();
 			LastSwap = CurTime;
 		}
-
+		
 		CommandProcessor::SetCpStatus();
 
 		Common::AtomicStore(CommandProcessor::VITicks, CommandProcessor::m_cpClockOrigin);

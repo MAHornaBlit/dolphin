@@ -126,6 +126,8 @@ public:
 	virtual void SetMultiVSConstant3fv(unsigned int const_number, unsigned int count, const float *f) = 0;
 	virtual void SetMultiVSConstant4fv(unsigned int const_number, unsigned int count, const float *f) = 0;
 
+	static bool XFBWrited;
+
 protected:
 
 	static void CalculateTargetScale(int x, int y, int &scaledX, int &scaledY);
@@ -160,7 +162,6 @@ protected:
 	static int s_LastEFBScale;
 
 	static bool s_skipSwap;
-	static bool XFBWrited;
 
 	static bool s_EnableDLCachingAfterRecording;
 
