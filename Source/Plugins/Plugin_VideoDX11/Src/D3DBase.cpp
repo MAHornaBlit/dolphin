@@ -493,8 +493,10 @@ HRESULT Create(HWND wnd)
 		D3D11_TEXTURE2D_DESC desc;
 
 		buf->GetDesc(&desc);
+
+		desc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
 		device->CreateTexture2D(&desc, NULL, &bb);
-		DestRTs[i] = new D3DTexture2D(bb, D3D11_BIND_RENDER_TARGET);
+		DestRTs[i] = new D3DTexture2D(bb, (D3D11_BIND_FLAG)(D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE));
 		SAFE_RELEASE(bb);
 	}
 	SAFE_RELEASE(buf);

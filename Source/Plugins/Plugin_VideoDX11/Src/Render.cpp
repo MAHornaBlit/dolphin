@@ -816,7 +816,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 
 
 
-	bool renderToOculus = false;
+	bool renderToOculus = true;
 
 
 
