@@ -120,6 +120,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTests", "UnitTests\Unit
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "miniupnpc", "..\Externals\miniupnpc\miniupnpc.vcxproj", "{A680190D-0764-485B-9CF3-A82C5EDD5715}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibOVR", "..\Externals\OculusSDK\LibOVR\Projects\Win32\VS2010\LibOVR.vcxproj", "{934B40C7-F40A-4E4C-97A7-B9659BE0A441}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -441,6 +443,17 @@ Global
 		{A680190D-0764-485B-9CF3-A82C5EDD5715}.Release|Win32.Build.0 = Release|Win32
 		{A680190D-0764-485B-9CF3-A82C5EDD5715}.Release|x64.ActiveCfg = Release|x64
 		{A680190D-0764-485B-9CF3-A82C5EDD5715}.Release|x64.Build.0 = Release|x64
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.Debug|Win32.ActiveCfg = Debug|Win32
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.Debug|Win32.Build.0 = Debug|Win32
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.Debug|x64.ActiveCfg = Debug|x64
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.Debug|x64.Build.0 = Debug|x64
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.DebugFast|Win32.ActiveCfg = Debug|x64
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.DebugFast|x64.ActiveCfg = Debug|x64
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.DebugFast|x64.Build.0 = Debug|x64
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.Release|Win32.ActiveCfg = Release|Win32
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.Release|Win32.Build.0 = Release|Win32
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.Release|x64.ActiveCfg = Release|x64
+		{934B40C7-F40A-4E4C-97A7-B9659BE0A441}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
