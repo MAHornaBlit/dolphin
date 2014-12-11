@@ -866,8 +866,9 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	D3D11_VIEWPORT vp = CD3D11_VIEWPORT((float)X, (float)Y, (float)Width, (float)Height);
 	D3D::context->RSSetViewports(1, &vp);
 
-	for (int i = 0; i < 2; ++i)	//draw to RT and to screen
+	//for (int i = 0; i < 2; ++i)	//draw to RT and to screen
 	{
+		int i = 0;	//draw just to Eye
 		ID3D11RenderTargetView *rtv = D3D::GetBackBuffer()->GetRTV();
 
 		if (i == 0)
@@ -888,9 +889,9 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 			D3D::context->ClearRenderTargetView(rtv, ClearColor);
 		}
 
-		if ((renderToOculus) && (i == 1)) {
-			break;
-		}
+//		if ((renderToOculus) && (i == 1)) {
+//			break;
+//		}
 
 
 		// activate linear filtering for the buffer copies
@@ -1802,7 +1803,7 @@ void Renderer::SetInterlacingMode()
 
 
 
-
+/*
 void DoRenderToOculus()
 {
 	return;
@@ -1840,3 +1841,4 @@ void DoRenderToOculus()
 		DX11::D3D::swapchain->Present(true, 0); // Vsync enabled
 
 }
+*/

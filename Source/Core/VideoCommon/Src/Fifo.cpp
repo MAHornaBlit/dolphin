@@ -163,7 +163,7 @@ void RunGpuLoop()
 			OutputDebugString(tmp);
 			//Force a lightweight swap
 			VideoFifo_DoLightSwap();
-			DoRenderToOculus();
+			//DoRenderToOculus();
 			LastSwap = CurTime;
 		}
 		
