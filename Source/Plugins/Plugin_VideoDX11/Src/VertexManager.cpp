@@ -22,6 +22,9 @@
 #include "XFBEncoder.h"
 #include "D3DUtil.h"
 
+#include "OVR.h"
+extern ovrHmd g_hmd;
+
 extern float GC_ALIGNED16(g_fProjectionMatrix[16]);
 
 // internal state for loading vertices
@@ -424,20 +427,52 @@ void VertexManager::DrawNode(_DisplayListNode::_DrawNode &node)
 	{
 		if (node.isprojectiontransform)
 		{
-			Matrix44 mtxA;
-			Matrix44 mtxB;
-			Matrix44 viewMtx;
+			ovrTrackingState ts = ovrHmd_GetTrackingState(g_hmd, ovr_GetTimeInSeconds());
+			if (ts.StatusFlags & (ovrStatus_OrientationTracked | ovrStatus_PositionTracked))
+			{
+				Matrix33 viewRotationMatrix;
 
-			Matrix44::Translate(mtxA, s_fViewTranslationVector);
-			Matrix44::LoadMatrix33(mtxB, s_viewRotationMatrix);
-			Matrix44::Multiply(mtxB, mtxA, viewMtx); // view = rotation x translation
-			Matrix44::Set(mtxB, node.projection);
-			Matrix44::Multiply(mtxB, viewMtx, mtxA); // mtxA = projection x view
-			Matrix44::Multiply(node.viewportcorrection, mtxA, mtxB); // mtxB = viewportCorrection x mtxA
+				ovrPoseStatef pose = ts.HeadPose;
 
-			//something like this...
-			//memcpy(vsconstants + C_PROJECTION * 4, mtxB.data, 16);
-			memcpy(&vsconstants[vs_constant_offset_table[C_PROJECTION]], mtxB.data, 4*4*sizeof(float));
+				Matrix33 mx;
+				Matrix33 my;
+				Matrix33 mz;
+				Matrix33::RotateX(mx, -pose.ThePose.Orientation.x);
+				Matrix33::RotateY(my, -pose.ThePose.Orientation.y);
+				Matrix33::RotateZ(mz, -pose.ThePose.Orientation.z);
+				Matrix33::Multiply(mx, my, viewRotationMatrix);
+				Matrix33::Multiply(viewRotationMatrix, mz, viewRotationMatrix);
+				
+				Matrix44 mtxA;
+				Matrix44 mtxB;
+				Matrix44 viewMtx;
+
+				Matrix44::Translate(mtxA, s_fViewTranslationVector);
+				Matrix44::LoadMatrix33(mtxB, viewRotationMatrix);
+				Matrix44::Multiply(mtxB, mtxA, viewMtx); // view = rotation x translation
+				Matrix44::Set(mtxB, node.projection);
+				Matrix44::Multiply(mtxB, viewMtx, mtxA); // mtxA = projection x view
+				Matrix44::Multiply(node.viewportcorrection, mtxA, mtxB); // mtxB = viewportCorrection x mtxA
+
+				//something like this...
+				//memcpy(vsconstants + C_PROJECTION * 4, mtxB.data, 16);
+				memcpy(&vsconstants[vs_constant_offset_table[C_PROJECTION]], mtxB.data, 4*4*sizeof(float));
+			} else {
+				Matrix44 mtxA;
+				Matrix44 mtxB;
+				Matrix44 viewMtx;
+
+				Matrix44::Translate(mtxA, s_fViewTranslationVector);
+				Matrix44::LoadMatrix33(mtxB, s_viewRotationMatrix);
+				Matrix44::Multiply(mtxB, mtxA, viewMtx); // view = rotation x translation
+				Matrix44::Set(mtxB, node.projection);
+				Matrix44::Multiply(mtxB, viewMtx, mtxA); // mtxA = projection x view
+				Matrix44::Multiply(node.viewportcorrection, mtxA, mtxB); // mtxB = viewportCorrection x mtxA
+
+				//something like this...
+				//memcpy(vsconstants + C_PROJECTION * 4, mtxB.data, 16);
+				memcpy(&vsconstants[vs_constant_offset_table[C_PROJECTION]], mtxB.data, 4*4*sizeof(float));
+			}
 		}
 	}
 

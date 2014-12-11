@@ -39,6 +39,9 @@
 #include "VideoBackend.h"
 #include "ConfigManager.h"
 
+#include "OVR.h"
+ovrHmd g_hmd;
+
 namespace DX11
 {
 
@@ -202,6 +205,15 @@ void VideoBackend::Video_Prepare()
 	PixelEngine::Init();
 	DLCache::Init();
 
+	//Oculus initialization
+	ovr_Initialize();
+	g_hmd = ovrHmd_Create(0);
+	unsigned int trackingCaps = 0;
+	trackingCaps |= ovrTrackingCap_Orientation;
+	//trackingCaps |= ovrTrackingCap_MagYawCorrection;
+	//trackingCaps |= ovrTrackingCap_Position;
+	ovrHmd_ConfigureTracking(g_hmd, trackingCaps, 0);
+
 	// Tell the host that the window is ready
 	Host_Message(WM_USER_CREATE);
 }
@@ -236,6 +248,10 @@ void VideoBackend::Shutdown()
 		delete g_renderer;
 		g_renderer = NULL;
 		g_texture_cache = NULL;
+
+		//Oculus shutdown
+		ovrHmd_Destroy(g_hmd);
+		ovr_Shutdown();
 	}
 }
 
