@@ -219,7 +219,7 @@ void VideoBackend::Video_Prepare()
 
 	//Oculus initialization
 	ovr_Initialize();
-	g_hmd = ovrHmd_Create(0);
+	g_hmd = ovrHmd_CreateDebug(ovrHmd_DK2); //ovrHmd_Create(0);
 
     if (!g_hmd) MessageBoxA(NULL,"Oculus Rift not detected.","", MB_OK);
     if (g_hmd->ProductName[0] == '\0') MessageBoxA(NULL,"Rift detected, display not enabled.", "", MB_OK);

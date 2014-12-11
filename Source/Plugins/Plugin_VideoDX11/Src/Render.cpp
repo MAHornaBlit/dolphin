@@ -47,6 +47,8 @@ extern ovrEyeRenderDesc g_EyeRenderDesc[2];     // Description of the VR
 extern volatile int g_Eye;
 extern VertexManager *g_vertex_manager;
 
+void DoRenderToOculus();
+
 namespace DX11
 {
 
@@ -812,6 +814,15 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	}
 
 
+
+
+	bool renderToOculus = false;
+
+
+
+
+
+
 #if 1
 
 	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
@@ -867,8 +878,20 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 
 		D3D::context->OMSetRenderTargets(1, &rtv, NULL);
 
-		float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
-		//D3D::context->ClearRenderTargetView(rtv, ClearColor);
+		if (i == 0) {
+			float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
+			D3D::context->ClearRenderTargetView(rtv, ClearColor);
+		}
+		else
+		{
+			float ClearColor[4] = { 1.f, 0.f, 0.f, 1.f };
+			D3D::context->ClearRenderTargetView(rtv, ClearColor);
+		}
+
+		if ((renderToOculus) && (i == 1)) {
+			break;
+		}
+
 
 		// activate linear filtering for the buffer copies
 		D3D::SetLinearCopySampler();
@@ -925,7 +948,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 					//drawRc.right *= hScale;
 				}
 
-				//xfbSource->Draw(sourceRc, drawRc, 0, 0);
+				xfbSource->Draw(sourceRc, drawRc, 0, 0);
 			}
 		}
 		else
@@ -934,7 +957,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 
 			// TODO: Improve sampling algorithm for the pixel shader so that we can use the multisampled EFB texture as source
 			D3DTexture2D* read_texture = FramebufferManager::GetResolvedEFBColorTexture();
-			//D3D::drawShadedTexQuad(read_texture->GetSRV(), targetRc.AsRECT(), Renderer::GetTargetWidth(), Renderer::GetTargetHeight(), PixelShaderCache::GetColorCopyProgram(false), VertexShaderCache::GetSimpleVertexShader(), VertexShaderCache::GetSimpleInputLayout(), Gamma);
+			D3D::drawShadedTexQuad(read_texture->GetSRV(), targetRc.AsRECT(), Renderer::GetTargetWidth(), Renderer::GetTargetHeight(), PixelShaderCache::GetColorCopyProgram(false), VertexShaderCache::GetSimpleVertexShader(), VertexShaderCache::GetSimpleInputLayout(), Gamma);
 		}
 	}
 
@@ -945,19 +968,74 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	Renderer::DrawDebugText();
 
 	OSD::DrawMessages();
-	//D3D::EndFrame();
+	D3D::EndFrame();
 	frameCount++;
 
 	TextureCache::Cleanup();
 
 	stats.ResetFrame();
 
-	// Flip/present backbuffer to frontbuffer here
-	//D3D::Present();
+
+	//DoRenderToOculus();
+
+
+
+
+	if (renderToOculus) {
+
+		ovrHmd_BeginFrame(g_hmd, 0);
+
+		ovrPosef         EyeRenderPose[2];
+
+		ovrVector3f useHmdToEyeViewOffset[2] = { g_EyeRenderDesc[0].HmdToEyeViewOffset,
+			g_EyeRenderDesc[1].HmdToEyeViewOffset };
+
+
+		EyeRenderPose[0].Orientation.w = 1.0f;
+		EyeRenderPose[1].Orientation.w = 1.0f;
+
+		ovrHmd_GetEyePoses(g_hmd, 0, useHmdToEyeViewOffset, EyeRenderPose, NULL);
+
+		ovrRecti         EyeRenderViewport[2];
+
+		for (int eye = 0; eye < 2; eye++)
+		{
+			EyeRenderViewport[eye].Pos = OVR::Vector2i(0, 0);
+			EyeRenderViewport[eye].Size = OVR::Sizei(g_BackBufferWidth, g_BackBufferHeight);
+		}
+
+		ovrD3D11Texture eyeTexture[2]; // Gather data for eye textures 
+		for (int eye = 0; eye < 2; eye++)
+		{
+			eyeTexture[eye].D3D11.Header.API = ovrRenderAPI_D3D11;
+			eyeTexture[eye].D3D11.Header.TextureSize = OVR::Sizei(g_BackBufferWidth, g_BackBufferHeight);
+			eyeTexture[eye].D3D11.Header.RenderViewport = EyeRenderViewport[eye];
+			eyeTexture[eye].D3D11.pTexture = DX11::D3D::DestRTs[DX11::D3D::LastDisplayedRT]->GetTex();
+			eyeTexture[eye].D3D11.pSRView = DX11::D3D::DestRTs[DX11::D3D::LastDisplayedRT]->GetSRV();
+		}
+
+		ovrHmd_EndFrame(g_hmd, EyeRenderPose, &eyeTexture[0].Texture);
+
+	}
+	else 
+	{
+		// Flip/present backbuffer to frontbuffer here
+		D3D::Present();
+	}
+
+
+
+
+
+
+
+
+
+
 
 	Renderer::RestoreAPIState();
 
-	//D3D::BeginFrame();
+	D3D::BeginFrame();
 	D3D::context->OMSetRenderTargets(1, &FramebufferManager::GetEFBColorTexture()->GetRTV(), FramebufferManager::GetEFBDepthTexture()->GetDSV());
 	VertexShaderManager::SetViewportChanged();
 
@@ -1727,6 +1805,7 @@ void Renderer::SetInterlacingMode()
 
 void DoRenderToOculus()
 {
+	return;
 	//DX11::D3D::DestRTs[DX11::D3D::LastDisplayedRT] contains the latest displayed render target
 
 	ovrHmd_BeginFrame(g_hmd, 0);
