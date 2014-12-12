@@ -495,7 +495,7 @@ void VertexShaderManager::SetConstants()
 		if (xfregs.projection.type == GX_PERSPECTIVE)
 		{
 			ovrTrackingState ts = ovrHmd_GetTrackingState(g_hmd, ovr_GetTimeInSeconds());
-			if (ts.StatusFlags & (ovrStatus_OrientationTracked | ovrStatus_PositionTracked))
+			if (ts.StatusFlags & (ovrStatus_OrientationTracked))
 			{
 				Matrix33 viewRotationMatrix;
 
@@ -504,9 +504,9 @@ void VertexShaderManager::SetConstants()
 				Matrix33 mx;
 				Matrix33 my;
 				Matrix33 mz;
-				Matrix33::RotateX(mx, -pose.ThePose.Orientation.x);
-				Matrix33::RotateY(my, -pose.ThePose.Orientation.y);
-				Matrix33::RotateZ(mz, -pose.ThePose.Orientation.z);
+				Matrix33::RotateX(mx, pose.ThePose.Orientation.x);
+				Matrix33::RotateY(my, pose.ThePose.Orientation.y);
+				Matrix33::RotateZ(mz, pose.ThePose.Orientation.z);
 				Matrix33::Multiply(mx, my, viewRotationMatrix);
 				Matrix33::Multiply(viewRotationMatrix, mz, viewRotationMatrix);
 
