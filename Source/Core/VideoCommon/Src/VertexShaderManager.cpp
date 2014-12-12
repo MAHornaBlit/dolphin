@@ -18,9 +18,12 @@
 #include "XFMemory.h"
 #include "VideoCommon.h"
 #include "VertexManagerBase.h"
-#include "..\..\..\Externals\OculusSDK\LibOVR\Include\OVR.h"
-extern ovrHmd g_hmd;
 
+#include "..\..\..\Externals\OculusSDK\LibOVR\Include\OVR.h"
+#include "..\..\..\Externals\OculusSDK\LibOVR\Src\Kernel\OVR_Math.h"
+
+extern ovrHmd g_hmd;
+extern ovrPosef g_TempEyeRenderPose[2];
 
 #include "RenderBase.h"
 float GC_ALIGNED16(g_fProjectionMatrix[16]);
@@ -494,19 +497,20 @@ void VertexShaderManager::SetConstants()
 		//oculus
 		if (xfregs.projection.type == GX_PERSPECTIVE)
 		{
-			ovrTrackingState ts = ovrHmd_GetTrackingState(g_hmd, ovr_GetTimeInSeconds());
-			if (ts.StatusFlags & (ovrStatus_OrientationTracked))
+			//ovrTrackingState ts = ovrHmd_GetTrackingState(g_hmd, ovr_GetTimeInSeconds());
+			//if (ts.StatusFlags & (ovrStatus_OrientationTracked))
 			{
 				Matrix33 viewRotationMatrix;
 
-				ovrPoseStatef pose = ts.HeadPose;
+				ovrPosef pose = g_TempEyeRenderPose[0]; //ts.HeadPose;
+
 
 				Matrix33 mx;
 				Matrix33 my;
 				Matrix33 mz;
-				Matrix33::RotateX(mx, pose.ThePose.Orientation.x);
-				Matrix33::RotateY(my, pose.ThePose.Orientation.y);
-				Matrix33::RotateZ(mz, pose.ThePose.Orientation.z);
+				Matrix33::RotateX(mx, -pose.Orientation.x);
+				Matrix33::RotateY(my, -pose.Orientation.y);
+				Matrix33::RotateZ(mz, -pose.Orientation.z);
 				Matrix33::Multiply(mx, my, viewRotationMatrix);
 				Matrix33::Multiply(viewRotationMatrix, mz, viewRotationMatrix);
 
@@ -521,7 +525,8 @@ void VertexShaderManager::SetConstants()
 
 				SetMultiVSConstant4fv(C_PROJECTION, 4, mtxB.data);
 			}
-			else if(g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo) {	//freelook
+			 
+			if(g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo) {	//freelook
 				Matrix44 mtxA;
 				Matrix44 mtxB;
 				Matrix44 viewMtx;

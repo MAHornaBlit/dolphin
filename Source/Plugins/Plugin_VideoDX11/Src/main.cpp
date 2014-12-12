@@ -47,6 +47,8 @@
 
 ovrHmd g_hmd;
 ovrEyeRenderDesc g_EyeRenderDesc[2];     // Description of the VR.
+ovrPosef g_EyeRenderPose[2];
+ovrPosef g_TempEyeRenderPose[2];
 
 namespace DX11
 {
@@ -274,7 +276,12 @@ void VideoBackend::Video_Prepare()
 		MessageBoxA(NULL, "Unable to configure Oculus Rift", "", MB_OK);
 	}
 
+	ovrVector3f useHmdToEyeViewOffset[2] = { g_EyeRenderDesc[0].HmdToEyeViewOffset,
+		g_EyeRenderDesc[1].HmdToEyeViewOffset };
 
+	ovrHmd_GetEyePoses(g_hmd, 0, useHmdToEyeViewOffset, g_EyeRenderPose, NULL);
+	g_TempEyeRenderPose[0] = g_EyeRenderPose[0];
+	g_TempEyeRenderPose[1] = g_EyeRenderPose[1];
 
 	// Tell the host that the window is ready
 	Host_Message(WM_USER_CREATE);

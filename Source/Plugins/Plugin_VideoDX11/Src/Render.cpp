@@ -42,7 +42,8 @@
 
 extern ovrHmd g_hmd;
 extern ovrEyeRenderDesc g_EyeRenderDesc[2];     // Description of the VR.
-
+extern ovrPosef g_EyeRenderPose[2];
+extern ovrPosef g_TempEyeRenderPose[2];
 
 void DoRenderToOculus(bool full);
 
@@ -1445,21 +1446,27 @@ void Renderer::SetInterlacingMode()
 
 }  // namespace DX11
 
+
 //full is true if it's a newly generated image, false if it's a re-draw of the latest one (should draw with timewarp)
 void DoRenderToOculus(bool full)
 {
 	ovrHmd_BeginFrame(g_hmd, 0);
 
-	ovrPosef         EyeRenderPose[2];
+
 
 	ovrVector3f useHmdToEyeViewOffset[2] = { g_EyeRenderDesc[0].HmdToEyeViewOffset,
 		g_EyeRenderDesc[1].HmdToEyeViewOffset };
 
 
-	EyeRenderPose[0].Orientation.w = 1.0f;
-	EyeRenderPose[1].Orientation.w = 1.0f;
+	//EyeRenderPose[0].Orientation.w = 1.0f;
+	//EyeRenderPose[1].Orientation.w = 1.0f;
 
-	ovrHmd_GetEyePoses(g_hmd, 0, useHmdToEyeViewOffset, EyeRenderPose, NULL);
+
+
+	if (full) {
+		g_EyeRenderPose[0]= g_TempEyeRenderPose[0];
+		g_EyeRenderPose[1]= g_TempEyeRenderPose[1];
+	}
 
 	ovrRecti         EyeRenderViewport[2];
 
@@ -1479,5 +1486,10 @@ void DoRenderToOculus(bool full)
 		eyeTexture[eye].D3D11.pSRView = DX11::D3D::eyebuf->GetSRV();
 	}
 
-	ovrHmd_EndFrame(g_hmd, EyeRenderPose, &eyeTexture[0].Texture);
+	ovrHmd_EndFrame(g_hmd, g_EyeRenderPose, &eyeTexture[0].Texture);
+
+	if (full) {
+		ovrHmd_GetEyePoses(g_hmd, 0, useHmdToEyeViewOffset, g_TempEyeRenderPose, NULL);
+	}
+
 }
