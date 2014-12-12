@@ -65,6 +65,7 @@ void VideoBackendHardware::Video_SetRendering(bool bEnabled)
 	Fifo_SetRendering(bEnabled);
 }
 
+extern LARGE_INTEGER LastSwap;
 // Run from the graphics thread (from Fifo.cpp)
 void VideoFifo_CheckSwapRequest()
 {
@@ -72,6 +73,7 @@ void VideoFifo_CheckSwapRequest()
 	{
 		if (Common::AtomicLoadAcquire(s_swapRequested))
 		{
+			QueryPerformanceCounter(&LastSwap);
 			EFBRectangle rc;
 			g_renderer->Swap(s_beginFieldArgs.xfbAddr, s_beginFieldArgs.field, s_beginFieldArgs.fbWidth, s_beginFieldArgs.fbHeight,rc);
 			Common::AtomicStoreRelease(s_swapRequested, false);

@@ -128,6 +128,9 @@ void ResetVideoBuffer()
 	size = 0;
 }
 
+LARGE_INTEGER LastSwap;
+LARGE_INTEGER Freq;
+void DoRenderToOculus(bool full);
 
 // Description: Main FIFO update loop
 // Purpose: Keep the Core HW updated about the CPU-GPU distance
@@ -138,11 +141,30 @@ void RunGpuLoop()
 	SCPFifoStruct &fifo = CommandProcessor::fifo;
 	u32 cyclesExecuted = 0;
 
+	QueryPerformanceFrequency(&Freq);
+	QueryPerformanceCounter(&LastSwap);
+
+	LARGE_INTEGER max_oculus_time;
+	max_oculus_time.QuadPart = (Freq.QuadPart / 75LL);
+
+	while (GpuRunningState)
+
+
 	while (GpuRunningState)
 	{
 		g_video_backend->PeekMessages();
 
 		VideoFifo_CheckAsyncRequest();
+
+		LARGE_INTEGER CurTime;
+		QueryPerformanceCounter(&CurTime);
+
+		if ((CurTime.QuadPart - LastSwap.QuadPart) > max_oculus_time.QuadPart)
+		{
+			//Force redraw of oculus eye texture at 75Hz
+			DoRenderToOculus(false);
+			LastSwap = CurTime;
+		}
 
 		CommandProcessor::SetCpStatus();
 

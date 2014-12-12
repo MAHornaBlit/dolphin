@@ -34,8 +34,24 @@
 #include "ConfigManager.h"
 #include <strsafe.h>
 
+#include "../Src/OVR_CAPI.h"
+#include "../Src/Kernel/OVR_Math.h"
+
+#define   OVR_D3D_VERSION 11
+#include "../Src/OVR_CAPI_D3D.h"
+
+extern ovrHmd g_hmd;
+extern ovrEyeRenderDesc g_EyeRenderDesc[2];     // Description of the VR.
+
+
+void DoRenderToOculus(bool full);
+
 namespace DX11
 {
+	namespace D3D
+	{
+		extern D3DTexture2D* eyebuf;
+	}
 
 static int s_fps = 0;
 
@@ -820,10 +836,10 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	if (Height > (s_backbuffer_height - Y)) Height = s_backbuffer_height - Y;
 	D3D11_VIEWPORT vp = CD3D11_VIEWPORT((float)X, (float)Y, (float)Width, (float)Height);
 	D3D::context->RSSetViewports(1, &vp);
-	D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
+	D3D::context->OMSetRenderTargets(1, &D3D::eyebuf->GetRTV(), NULL);
 
 	float ClearColor[4] = { 0.f, 0.f, 0.f, 1.f };
-	D3D::context->ClearRenderTargetView(D3D::GetBackBuffer()->GetRTV(), ClearColor);
+	D3D::context->ClearRenderTargetView(D3D::eyebuf->GetRTV(), ClearColor);
 
 	// activate linear filtering for the buffer copies
 	D3D::SetLinearCopySampler();
@@ -910,7 +926,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 			CreateScreenshotTexture(GetTargetRectangle());
 
 		D3D11_BOX box = CD3D11_BOX(GetTargetRectangle().left, GetTargetRectangle().top, 0, GetTargetRectangle().right, GetTargetRectangle().bottom, 1);
-		D3D::context->CopySubresourceRegion(s_screenshot_texture, 0, 0, 0, 0, (ID3D11Resource*)D3D::GetBackBuffer()->GetTex(), 0, &box);
+		D3D::context->CopySubresourceRegion(s_screenshot_texture, 0, 0, 0, 0, (ID3D11Resource*)D3D::eyebuf->GetTex(), 0, &box);
 		if (!bLastFrameDumped)
 		{
 			s_recordWidth = GetTargetRectangle().GetWidth();
@@ -1033,7 +1049,9 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 	stats.ResetFrame();
 
 	// Flip/present backbuffer to frontbuffer here
-	D3D::Present();
+	//D3D::Present();
+	D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
+	DoRenderToOculus(true);
 
 	// resize the back buffers NOW to avoid flickering
 	if (xfbchanged ||
@@ -1058,7 +1076,7 @@ void Renderer::Swap(u32 xfbAddr, FieldType field, u32 fbWidth, u32 fbHeight,cons
 		s_LastEFBScale = g_ActiveConfig.iEFBScale;
 		CalculateTargetSize(s_backbuffer_width, s_backbuffer_height);
 
-		D3D::context->OMSetRenderTargets(1, &D3D::GetBackBuffer()->GetRTV(), NULL);
+		D3D::context->OMSetRenderTargets(1, &D3D::eyebuf->GetRTV(), NULL);
 
 		delete g_framebuffer_manager;
 		g_framebuffer_manager = new FramebufferManager;
@@ -1426,3 +1444,40 @@ void Renderer::SetInterlacingMode()
 }
 
 }  // namespace DX11
+
+//full is true if it's a newly generated image, false if it's a re-draw of the latest one (should draw with timewarp)
+void DoRenderToOculus(bool full)
+{
+	ovrHmd_BeginFrame(g_hmd, 0);
+
+	ovrPosef         EyeRenderPose[2];
+
+	ovrVector3f useHmdToEyeViewOffset[2] = { g_EyeRenderDesc[0].HmdToEyeViewOffset,
+		g_EyeRenderDesc[1].HmdToEyeViewOffset };
+
+
+	EyeRenderPose[0].Orientation.w = 1.0f;
+	EyeRenderPose[1].Orientation.w = 1.0f;
+
+	ovrHmd_GetEyePoses(g_hmd, 0, useHmdToEyeViewOffset, EyeRenderPose, NULL);
+
+	ovrRecti         EyeRenderViewport[2];
+
+	for (int eye = 0; eye < 2; eye++)
+	{
+		EyeRenderViewport[eye].Pos = OVR::Vector2i(0, 0);
+		EyeRenderViewport[eye].Size = OVR::Sizei(DX11::D3D::GetBackBufferWidth(), DX11::D3D::GetBackBufferHeight());
+	}
+
+	ovrD3D11Texture eyeTexture[2]; // Gather data for eye textures 
+	for (int eye = 0; eye < 2; eye++)
+	{
+		eyeTexture[eye].D3D11.Header.API = ovrRenderAPI_D3D11;
+		eyeTexture[eye].D3D11.Header.TextureSize = OVR::Sizei(DX11::D3D::GetBackBufferWidth(), DX11::D3D::GetBackBufferHeight());
+		eyeTexture[eye].D3D11.Header.RenderViewport = EyeRenderViewport[eye];
+		eyeTexture[eye].D3D11.pTexture = DX11::D3D::eyebuf->GetTex();
+		eyeTexture[eye].D3D11.pSRView = DX11::D3D::eyebuf->GetSRV();
+	}
+
+	ovrHmd_EndFrame(g_hmd, EyeRenderPose, &eyeTexture[0].Texture);
+}

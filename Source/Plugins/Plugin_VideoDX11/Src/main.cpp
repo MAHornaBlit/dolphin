@@ -39,6 +39,15 @@
 #include "VideoBackend.h"
 #include "ConfigManager.h"
 
+#include "../Src/OVR_CAPI.h"
+#include "../Src/Kernel/OVR_Math.h"
+
+#define   OVR_D3D_VERSION 11
+#include "../Src/OVR_CAPI_D3D.h"
+
+ovrHmd g_hmd;
+ovrEyeRenderDesc g_EyeRenderDesc[2];     // Description of the VR.
+
 namespace DX11
 {
 
@@ -201,6 +210,71 @@ void VideoBackend::Video_Prepare()
 	CommandProcessor::Init();
 	PixelEngine::Init();
 	DLCache::Init();
+
+
+	//Oculus initialization
+	ovr_Initialize();
+	g_hmd = ovrHmd_CreateDebug(ovrHmd_DK2); //ovrHmd_Create(0);
+
+	if (!g_hmd) MessageBoxA(NULL, "Oculus Rift not detected.", "", MB_OK);
+	if (g_hmd->ProductName[0] == '\0') MessageBoxA(NULL, "Rift detected, display not enabled.", "", MB_OK);
+
+
+	// Setup Window and Graphics - use window frame if relying on Oculus driver
+	bool windowed = (g_hmd->HmdCaps & ovrHmdCap_ExtendDesktop) ? false : true;
+	//    if (!DX11.InitWindowAndDevice(hinst, Recti(HMD->WindowsPos, HMD->Resolution), windowed))
+	//        return(0);
+
+	//DX11.SetMaxFrameLatency(1);
+	ovrHmd_AttachToWindow(g_hmd, EmuWindow::GetWnd(), NULL, NULL);
+	ovrHmd_SetEnabledCaps(g_hmd, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
+
+
+	unsigned int trackingCaps = 0;
+	trackingCaps |= ovrTrackingCap_Orientation;
+	//trackingCaps |= ovrTrackingCap_MagYawCorrection;
+	//trackingCaps |= ovrTrackingCap_Position;
+	ovrHmd_ConfigureTracking(g_hmd, trackingCaps, 0);
+
+	//// Make the eye render buffers (caution if actual size < requested due to HW limits). 
+	//for (int eye=0; eye<2; eye++)
+	//{
+	//    Sizei idealSize             = ovrHmd_GetFovTextureSize(HMD, (ovrEyeType)eye,
+	//                                                           HMD->DefaultEyeFov[eye], 1.0f);
+	//    pEyeRenderTexture[eye]      = new ImageBuffer(true, false, idealSize);
+	//    pEyeDepthBuffer[eye]        = new ImageBuffer(true, true, pEyeRenderTexture[eye]->Size);
+	//    EyeRenderViewport[eye].Pos  = Vector2i(0, 0);
+	//    EyeRenderViewport[eye].Size = pEyeRenderTexture[eye]->Size;
+	//}
+
+
+
+
+	ovrD3D11Config d3d11cfg;
+	d3d11cfg.D3D11.Header.API = ovrRenderAPI_D3D11;
+	d3d11cfg.D3D11.Header.BackBufferSize = OVR::Sizei(D3D::GetBackBufferWidth(), D3D::GetBackBufferHeight());
+	d3d11cfg.D3D11.Header.Multisample = 1;
+	d3d11cfg.D3D11.pDevice = DX11::D3D::device;
+	d3d11cfg.D3D11.pDeviceContext = DX11::D3D::context;
+	d3d11cfg.D3D11.pBackBufferRT = DX11::D3D::GetBackBuffer()->GetRTV();
+	d3d11cfg.D3D11.pSwapChain = DX11::D3D::swapchain;
+
+	unsigned           distortionCaps = ovrDistortionCap_Chromatic;
+
+	distortionCaps |= ovrDistortionCap_Vignette;
+	distortionCaps |= ovrDistortionCap_SRGB;
+	distortionCaps |= ovrDistortionCap_Overdrive;
+	distortionCaps |= ovrDistortionCap_TimeWarp;
+	distortionCaps |= ovrDistortionCap_HqDistortion;
+
+
+	if (!ovrHmd_ConfigureRendering(g_hmd, &d3d11cfg.Config,
+		distortionCaps,
+		g_hmd->DefaultEyeFov, g_EyeRenderDesc)) {
+		MessageBoxA(NULL, "Unable to configure Oculus Rift", "", MB_OK);
+	}
+
+
 
 	// Tell the host that the window is ready
 	Host_Message(WM_USER_CREATE);

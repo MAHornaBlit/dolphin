@@ -115,7 +115,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugFast|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>.\Src;..\Common\Src;..\VideoCommon\Src;..\AudioCommon\Src;..\DiscIO\Src;..\InputCommon\Src;..\wiiuse\Src;..\..\..\Externals\Bochs_disasm;..\..\..\Externals\SFML\include;..\..\..\Externals\LZO;..\..\..\Externals\portaudio\include;..\..\..\Externals\zlib;..\..\..\Externals\miniupnpc\src;..\..\..\Externals\polarssl\include;..\..\..\Externals\libusb\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\Src;..\Common\Src;..\VideoCommon\Src;..\AudioCommon\Src;..\DiscIO\Src;..\InputCommon\Src;..\wiiuse\Src;..\..\..\Externals\Bochs_disasm;..\..\..\Externals\SFML\include;..\..\..\Externals\LZO;..\..\..\Externals\portaudio\include;..\..\..\Externals\zlib;..\..\..\Externals\miniupnpc\src;..\..\..\Externals\polarssl\include;..\..\..\Externals\libusb\include;..\..\..\Externals\OculusSDK\LibOVR\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -139,7 +139,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>.\Src;..\Common\Src;..\VideoCommon\Src;..\AudioCommon\Src;..\DiscIO\Src;..\InputCommon\Src;..\wiiuse\Src;..\..\..\Externals\Bochs_disasm;..\..\..\Externals\SFML\include;..\..\..\Externals\LZO;..\..\..\Externals\portaudio\include;..\..\..\Externals\zlib;..\..\..\Externals\miniupnpc\src;..\..\..\Externals\polarssl\include;..\..\..\Externals\libusb\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\Src;..\Common\Src;..\VideoCommon\Src;..\AudioCommon\Src;..\DiscIO\Src;..\InputCommon\Src;..\wiiuse\Src;..\..\..\Externals\Bochs_disasm;..\..\..\Externals\SFML\include;..\..\..\Externals\LZO;..\..\..\Externals\portaudio\include;..\..\..\Externals\zlib;..\..\..\Externals\miniupnpc\src;..\..\..\Externals\polarssl\include;..\..\..\Externals\libusb\include;..\..\..\Externals\OculusSDK\LibOVR\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -153,7 +153,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugFast|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>.\Src;..\Common\Src;..\VideoCommon\Src;..\AudioCommon\Src;..\DiscIO\Src;..\InputCommon\Src;..\wiiuse\Src;..\..\..\Externals\Bochs_disasm;..\..\..\Externals\SFML\include;..\..\..\Externals\LZO;..\..\..\Externals\portaudio\include;..\..\..\Externals\zlib;..\..\..\Externals\miniupnpc\src;..\..\..\Externals\polarssl\include;..\..\..\Externals\libusb\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\Src;..\Common\Src;..\VideoCommon\Src;..\AudioCommon\Src;..\DiscIO\Src;..\InputCommon\Src;..\wiiuse\Src;..\..\..\Externals\Bochs_disasm;..\..\..\Externals\SFML\include;..\..\..\Externals\LZO;..\..\..\Externals\portaudio\include;..\..\..\Externals\zlib;..\..\..\Externals\miniupnpc\src;..\..\..\Externals\polarssl\include;..\..\..\Externals\libusb\include;..\..\..\Externals\OculusSDK\LibOVR\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

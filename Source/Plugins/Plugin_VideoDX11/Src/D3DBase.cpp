@@ -41,6 +41,7 @@ ID3D11DeviceContext* context = NULL;
 IDXGISwapChain* swapchain = NULL;
 D3D_FEATURE_LEVEL featlevel;
 D3DTexture2D* backbuf = NULL;
+D3DTexture2D* eyebuf = NULL;
 HWND hWnd;
 
 std::vector<DXGI_SAMPLE_DESC> aa_modes; // supported AA modes of the current adapter
@@ -378,10 +379,21 @@ HRESULT Create(HWND wnd)
 		return E_FAIL;
 	}
 	backbuf = new D3DTexture2D(buf, D3D11_BIND_RENDER_TARGET);
-	SAFE_RELEASE(buf);
 	CHECK(backbuf!=NULL, "Create back buffer texture");
 	SetDebugObjectName((ID3D11DeviceChild*)backbuf->GetTex(), "backbuffer texture");
 	SetDebugObjectName((ID3D11DeviceChild*)backbuf->GetRTV(), "backbuffer render target view");
+
+
+	D3D11_TEXTURE2D_DESC tdesc;
+	buf->GetDesc(&tdesc);
+	tdesc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
+
+	ID3D11Texture2D *pEye;
+	device->CreateTexture2D(&tdesc, NULL, &pEye);
+	eyebuf = new D3DTexture2D(pEye, (D3D11_BIND_FLAG)(D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE));
+
+
+	SAFE_RELEASE(buf);
 
 	context->OMSetRenderTargets(1, &backbuf->GetRTV(), NULL);
 

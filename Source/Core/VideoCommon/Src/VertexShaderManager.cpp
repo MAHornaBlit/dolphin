@@ -18,6 +18,9 @@
 #include "XFMemory.h"
 #include "VideoCommon.h"
 #include "VertexManagerBase.h"
+#include "..\..\..\Externals\OculusSDK\LibOVR\Include\OVR.h"
+extern ovrHmd g_hmd;
+
 
 #include "RenderBase.h"
 float GC_ALIGNED16(g_fProjectionMatrix[16]);
@@ -463,7 +466,7 @@ void VertexShaderManager::SetConstants()
 
 		PRIM_LOG("Projection: %f %f %f %f %f %f\n", rawProjection[0], rawProjection[1], rawProjection[2], rawProjection[3], rawProjection[4], rawProjection[5]);
 
-		if ((g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo ) && xfregs.projection.type == GX_PERSPECTIVE)
+		/*if ((g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo ) && xfregs.projection.type == GX_PERSPECTIVE)
 		{
 			Matrix44 mtxA;
 			Matrix44 mtxB;
@@ -477,6 +480,61 @@ void VertexShaderManager::SetConstants()
 			Matrix44::Multiply(s_viewportCorrection, mtxA, mtxB); // mtxB = viewportCorrection x mtxA
 
 			SetMultiVSConstant4fv(C_PROJECTION, 4, mtxB.data);
+		}
+		else
+		{
+			Matrix44 projMtx;
+			Matrix44::Set(projMtx, g_fProjectionMatrix);
+
+			Matrix44 correctedMtx;
+			Matrix44::Multiply(s_viewportCorrection, projMtx, correctedMtx);
+			SetMultiVSConstant4fv(C_PROJECTION, 4, correctedMtx.data);
+		}
+		*/
+		//oculus
+		if (xfregs.projection.type == GX_PERSPECTIVE)
+		{
+			ovrTrackingState ts = ovrHmd_GetTrackingState(g_hmd, ovr_GetTimeInSeconds());
+			if (ts.StatusFlags & (ovrStatus_OrientationTracked | ovrStatus_PositionTracked))
+			{
+				Matrix33 viewRotationMatrix;
+
+				ovrPoseStatef pose = ts.HeadPose;
+
+				Matrix33 mx;
+				Matrix33 my;
+				Matrix33 mz;
+				Matrix33::RotateX(mx, -pose.ThePose.Orientation.x);
+				Matrix33::RotateY(my, -pose.ThePose.Orientation.y);
+				Matrix33::RotateZ(mz, -pose.ThePose.Orientation.z);
+				Matrix33::Multiply(mx, my, viewRotationMatrix);
+				Matrix33::Multiply(viewRotationMatrix, mz, viewRotationMatrix);
+
+				Matrix44 mtxA;
+				Matrix44 mtxB;
+				Matrix44 viewMtx;
+
+				Matrix44::LoadMatrix33(viewMtx, viewRotationMatrix);	//view = rotation from oculus
+				Matrix44::Set(mtxB, g_fProjectionMatrix);
+				Matrix44::Multiply(mtxB, viewMtx, mtxA); // mtxA = projection x view
+				Matrix44::Multiply(s_viewportCorrection, mtxA, mtxB); // mtxB = viewportCorrection x mtxA
+
+				SetMultiVSConstant4fv(C_PROJECTION, 4, mtxB.data);
+			}
+			else if(g_ActiveConfig.bFreeLook || g_ActiveConfig.bAnaglyphStereo) {	//freelook
+				Matrix44 mtxA;
+				Matrix44 mtxB;
+				Matrix44 viewMtx;
+
+				Matrix44::Translate(mtxA, s_fViewTranslationVector);
+				Matrix44::LoadMatrix33(mtxB, s_viewRotationMatrix);
+				Matrix44::Multiply(mtxB, mtxA, viewMtx); // view = rotation x translation
+				Matrix44::Set(mtxB, g_fProjectionMatrix);
+				Matrix44::Multiply(mtxB, viewMtx, mtxA); // mtxA = projection x view
+				Matrix44::Multiply(s_viewportCorrection, mtxA, mtxB); // mtxB = viewportCorrection x mtxA
+
+				SetMultiVSConstant4fv(C_PROJECTION, 4, mtxB.data);
+			}
 		}
 		else
 		{

@@ -358,6 +358,9 @@ xcopy "$(SolutionDir)..\Externals\msvcrt\$(PlatformName)\*.dll" "$(TargetDir)" /
     <ProjectReference Include="..\..\..\Externals\miniupnpc\miniupnpc.vcxproj">
       <Project>{a680190d-0764-485b-9cf3-a82c5edd5715}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\Externals\OculusSDK\LibOVR\Projects\Win32\VS2010\LibOVR.vcxproj">
+      <Project>{934b40c7-f40a-4e4c-97a7-b9659be0a441}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\..\Externals\SFML\build\vc2010\SFML_Network.vcxproj">
       <Project>{93d73454-2512-424e-9cda-4bb357fe13dd}</Project>
     </ProjectReference>
