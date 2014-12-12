@@ -225,13 +225,14 @@ void RunGpuLoop()
 		else
 		{
 			// While the emu is paused, we still handle async requests then sleep.
-			while (!EmuRunningState)
+			/*while (!EmuRunningState)
 			{
 				g_video_backend->PeekMessages();
 				m_csHWVidOccupied.unlock();
 				Common::SleepCurrentThread(1);
 				m_csHWVidOccupied.lock();
 			}
+			*/
 		}
 	}
 }
